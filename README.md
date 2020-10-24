@@ -25,6 +25,8 @@ A CosmWasm smart contract, written in Rust, that instantiates a “Quadratic Fun
 - [ ] Regen Network / OpenTEAM logos & branding represented in the UI
 - [ ] Deploy your contract to the CosmWasm coral testnet, and share a working link to your dApp
 
+First iteration will only support single type of native coin.
+
 ## Messages
 
 ```rust
@@ -33,13 +35,10 @@ pub struct InitMsg {
     vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     voting_period: Expiration,
     proposal_period: Expiration,
+    coin_denom: String,
 }
 
 enum HandleMsg {
-    UpdatePeriods {
-        voting_period: Option<Expiration>,
-        proposal_period: Option<Expiration>,
-    },
     CreateProposal {
         description: String,
         metadata: String,
@@ -85,3 +84,7 @@ enum QueryMsg {
     AllProposals {},
 }
 ```
+
+## Iteration 2
+
+Support CW20

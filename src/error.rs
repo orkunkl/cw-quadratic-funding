@@ -8,6 +8,13 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Proposal period expired")]
+    ProposalPeriodExpired{},
+
+    #[error("Voting period expired")]
+    VotingPeriodExpired{},
+
+    #[error("Expected coin not sent (expected: {coin_denom})")]
+    ExpectedCoinNotSent{coin_denom: String},
 }
