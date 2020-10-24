@@ -1,97 +1,87 @@
-# CosmWasm Starter Pack
+# CosmWasm Quadratic Funding
 
-This is a template to build smart contracts in Rust to run inside a
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) module on all chains that enable it.
-To understand the framework better, please read the overview in the
-[cosmwasm repo](https://github.com/CosmWasm/cosmwasm/blob/master/README.md),
-and dig into the [cosmwasm docs](https://www.cosmwasm.com).
-This assumes you understand the theory and just want to get coding.
+A CosmWasm smart contract, written in Rust, that instantiates a “Quadratic Funding Round”, and has the following functionality:
 
-## Creating a new repo from template
+- Coins sent with contract instantiation goes into the common funding pool, to be reallocated based on the Quadratic Funding formula.
+- Contract parameterized by a list of whitelisted addresses who can make proposals, and a list of whitelisted addresses who can vote on proposals. Empty list means permissionless proposals/voting.
+- Proposers can make text based proposals via contract function calls, and set the address that funds should be sent to.
+- Proposal periods / voting periods are either defined in advance by contract parameters, or are explicitly triggered via function calls from contract creator / admin.
+    If periods are triggered via function calls, minimum proposal periods / voting periods should be set upon contract instantiation.
+- Voters vote on proposals by sending coins to the contract in a function call referencing a proposal.
+- Once voting period ends, contract creator / admin triggers the distribution of funds to proposals according to a quadratic funding formula.
+- A web based user interface (using CosmJS) with the following functionality:
+- Allows instantiation of a new contract / creation of new proposal round
+- Enables sending of proposals, and voting on proposals
+- Enables viewing all proposals and votes for a given contract / Quadratic Funding Round
+- Video demo showcasing functionality of your Quadratic Funding dApp!
 
-Assuming you have a recent version of rust and cargo (v1.44.1+) installed
-(via [rustup](https://rustup.rs/)),
-then the following should get you a new repo to start a contract:
+## Bonus Points
 
-First, install
-[cargo-generate](https://github.com/ashleygwilliams/cargo-generate).
-Unless you did that before, run this line now:
+- [ ] Support for alternative funding formulas (besides the standard quadratic funding formula)
+- [ ] Support for structured proposal metadata
+- [ ] Support for multiple funding rounds per contract
+- [ ] Variable proposal periods / voting periods
+- [ ] Support for more fine grained queries like “get proposal text/metadata by proposal ID”
+- [ ] Regen Network / OpenTEAM logos & branding represented in the UI
+- [ ] Deploy your contract to the CosmWasm coral testnet, and share a working link to your dApp
 
-```sh
-cargo install cargo-generate --features vendored-openssl
+## Messages
+
+```rust
+pub struct InitMsg {
+    create_proposal_whitelist: Option<Vec<HumanAddr>>,
+    vote_proposal_whitelist: Option<Vec<HumanAddr>>,
+    voting_period: Expiration,
+    proposal_period: Expiration,
+}
+
+enum HandleMsg {
+    UpdatePeriods {
+        voting_period: Option<Expiration>,
+        proposal_period: Option<Expiration>,
+    },
+    CreateProposal {
+        description: String,
+        metadata: String,
+        fund_address: HumanAddr
+    },
+    VoteProposal {
+        proposal_id: u32,
+    },
+    TriggerDistribution {
+        proposal_id: u32
+    },
+}
 ```
 
-Now, use it to create your new contract.
-Go to the folder in which you want to place it and run:
+### State
 
-**0.11 (latest)**
+```rust
+pub struct Proposal {
+    id: u32,
+    title: String,
+    metadata: String,
+    fund_address: HumanAddr,
+}
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --name PROJECT_NAME
+pub struct Vote {
+    id: u32,
+    proposal_id: u32,
+    voter: HumanAddr,
+    fund: Coin,
+}
 ```
 
-**0.10**
+### Queries
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --branch 0.10 --name PROJECT_NAME
+```rust
+enum QueryMsg {
+    ProposalByID {
+        id: u64,
+    },
+    ProposalByFundAddress {
+        fund_address: HumanAddr
+    },
+    AllProposals {},
+}
 ```
-
-**0.9**
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --branch 0.9 --name PROJECT_NAME
-```
-
-**0.8**
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --branch 0.8 --name PROJECT_NAME
-```
-
-You will now have a new folder called `PROJECT_NAME` (I hope you changed that to something else)
-containing a simple working contract and build system that you can customize.
-
-## Create a Repo
-
-After generating, you have a initialized local git repo, but no commits, and no remote.
-Go to a server (eg. github) and create a new upstream repo (called `YOUR-GIT-URL` below).
-Then run the following:
-
-```sh
-# this is needed to create a valid Cargo.lock file (see below)
-cargo check
-git checkout -b master # in case you generate from non-master
-git add .
-git commit -m 'Initial Commit'
-git remote add origin YOUR-GIT-URL
-git push -u origin master
-```
-
-## CI Support
-
-We have template configurations for both [GitHub Actions](.github/workflows/Basic.yml)
-and [Circle CI](.circleci/config.yml) in the generated project, so you can
-get up and running with CI right away.
-
-One note is that the CI runs all `cargo` commands
-with `--locked` to ensure it uses the exact same versions as you have locally. This also means
-you must have an up-to-date `Cargo.lock` file, which is not auto-generated.
-The first time you set up the project (or after adding any dep), you should ensure the
-`Cargo.lock` file is updated, so the CI will test properly. This can be done simply by
-running `cargo check` or `cargo unit-test`.
-
-## Using your project
-
-Once you have your custom repo, you should check out [Developing](./Developing.md) to explain
-more on how to run tests and develop code. Or go through the
-[online tutorial](https://www.cosmwasm.com/docs/getting-started/intro) to get a better feel
-of how to develop.
-
-[Publishing](./Publishing.md) contains useful information on how to publish your contract
-to the world, once you are ready to deploy it on a running blockchain. And
-[Importing](./Importing.md) contains information about pulling in other contracts or crates
-that have been published.
-
-Please replace this README file with information about your specific project. You can keep
-the `Developing.md` and `Publishing.md` files as useful referenced, but please set some
-proper description in the README.
