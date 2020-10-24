@@ -10,11 +10,11 @@ pub enum ContractError {
     Unauthorized {},
 
     #[error("Proposal period expired")]
-    ProposalPeriodExpired{},
+    ProposalPeriodExpired {},
 
     #[error("Voting period expired")]
-    VotingPeriodExpired{},
+    VotingPeriodExpired {},
 
     #[error("Expected coin not sent (expected: {coin_denom})")]
-    ExpectedCoinNotSent{coin_denom: String},
+    ExpectedCoinNotSent { coin_denom: String },
 }

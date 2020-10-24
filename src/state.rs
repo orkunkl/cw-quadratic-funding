@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Storage, HumanAddr, Coin};
+use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 use cw0::Expiration;
 
@@ -39,6 +39,7 @@ pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
     singleton_read(storage, CONFIG_KEY)
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Proposal {
     id: u32,
     title: String,
@@ -46,6 +47,7 @@ pub struct Proposal {
     fund_address: HumanAddr,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Vote {
     id: u32,
     proposal_id: u32,
