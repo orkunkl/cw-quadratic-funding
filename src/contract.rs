@@ -84,4 +84,6 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+}

@@ -85,18 +85,18 @@ pub enum QueryMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::coins;
+    use cosmwasm_std::{coin};
     use cosmwasm_std::testing::{mock_env, mock_info};
 
     #[test]
     fn validate_init_msg() {
         let mut env = mock_env();
-        let info = mock_info("creator", &coins(4, "ucosm"));
+        let denom = String::from("denom");
+        let info = mock_info("creator", &[coin(4, denom.as_str())]);
 
         env.block.height = 30;
-        let mut msg = InitMsg {
-            ..Default::default()
-        };
+        let mut msg = InitMsg {..Default::default()};
+
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);
         match msg1.validate(env.clone(), info.clone()) {
@@ -105,11 +105,21 @@ mod tests {
             Err(err) => println!("{:?}", err),
         }
 
-        msg.proposal_period = Expiration::AtHeight(15);
-        match msg.validate(env, info) {
+        let mut msg2 = msg.clone();
+        msg2.proposal_period = Expiration::AtHeight(15);
+        match msg2.validate(env.clone(), info.clone()) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::ProposalPeriodExpired{}) => {}
             Err(err) => println!("{:?}", err),
         }
+
+        let mut msg3 = msg.clone();
+        msg3.coin_denom = String::from("false");
+        match msg3.validate(env, info) {
+            Ok(_) => panic!("expected error"),
+            Err(ContractError::ExpectedCoinNotSent{ coin_denom:_ }) => {}
+            Err(err) => println!("{:?}", err),
+        }
+
     }
 }
