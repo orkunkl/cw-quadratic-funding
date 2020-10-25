@@ -69,14 +69,11 @@ pub enum HandleMsg {
         proposal_id: u32
     },
      */
-    Increment {},
-    Reset { count: i32 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetCount {},
     ProposalByID { id: u64 },
     ProposalByFundAddress { fund_address: HumanAddr },
     AllProposals {},
@@ -95,7 +92,7 @@ mod tests {
         let info = mock_info("creator", &[coin(4, denom.as_str())]);
 
         env.block.height = 30;
-        let mut msg = InitMsg {..Default::default()};
+        let msg = InitMsg {..Default::default()};
 
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);

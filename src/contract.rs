@@ -37,8 +37,6 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps),
-        HandleMsg::Reset { count } => try_reset(deps, info, count),
         HandleMsg::CreateProposal { .. } => try_create_proposal(deps, env, info),
     }
 }
@@ -56,40 +54,12 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
     Ok(HandleResponse::default())
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-) -> Result<HandleResponse, ContractError> {
-    state(&mut deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(HandleResponse::default())
-}
-
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    info: MessageInfo,
-    count: i32,
-) -> Result<HandleResponse, ContractError> {
-    let api = &deps.api;
-    state(&mut deps.storage).update(|mut state| -> Result<_, ContractError> {
-        if api.canonical_address(&info.sender)? != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(HandleResponse::default())
-}
-
 pub fn query<S: Storage, A: Api, Q: Querier>(
     _deps: &Extern<S, A, Q>,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount { .. } => {}
         QueryMsg::ProposalByID { .. } => {}
         QueryMsg::ProposalByFundAddress { .. } => {}
         QueryMsg::AllProposals { .. } => {}
