@@ -32,14 +32,28 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 // And declare a custom Error variant for the ones where you will want to make use of it
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Increment {} => try_increment(deps),
         HandleMsg::Reset { count } => try_reset(deps, info, count),
+        HandleMsg::CreateProposal { .. } => try_create_proposal(deps, env, info),
     }
+}
+
+pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    info: MessageInfo,
+) -> Result<HandleResponse, ContractError> {
+    state(&mut deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.count += 1;
+        Ok(state)
+    })?;
+
+    Ok(HandleResponse::default())
 }
 
 pub fn try_increment<S: Storage, A: Api, Q: Querier>(

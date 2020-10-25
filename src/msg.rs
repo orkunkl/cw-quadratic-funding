@@ -56,12 +56,12 @@ impl Default for InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    /*
     CreateProposal {
         description: String,
         metadata: String,
         fund_address: HumanAddr
     },
+    /*
     VoteProposal {
         proposal_id: u32,
     },
