@@ -1,12 +1,12 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, StdResult, Storage};
+use cosmwasm_storage::{nextval, singleton, singleton_read, ReadonlySingleton, Singleton};
 use cw0::Expiration;
+use cw_storage_plus::{Item, Map};
 
 pub static STATE_KEY: &[u8] = b"state";
-pub static CONFIG_KEY: &[u8] = b"config";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
@@ -31,26 +31,34 @@ pub struct Config {
     pub coin_denom: String,
 }
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, Config> {
-    singleton(storage, CONFIG_KEY)
-}
-
-pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
-    singleton_read(storage, CONFIG_KEY)
-}
+pub const CONFIG: Item<Config> = Item::new(b"config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Proposal {
-    id: u32,
-    title: String,
-    metadata: String,
-    fund_address: HumanAddr,
+    pub title: String,
+    pub description: String,
+    pub metadata: String,
+    pub fund_address: HumanAddr,
+}
+
+pub const PROPOSALS: Map<&[u8], Proposal> = Map::new(b"proposal");
+pub const PROPOSAL_SEQ: &[u8] = b"proposal_seq";
+
+pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
+    singleton(storage, PROPOSAL_SEQ)
+}
+
+pub fn create_proposal<S: Storage>(storage: &mut S, p: &Proposal) -> StdResult<u64> {
+    let next_id = nextval(&mut proposal_seq(storage))?;
+    PROPOSALS.save(storage, &next_id.to_be_bytes(), p)?;
+    Ok(next_id)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Vote {
-    id: u32,
-    proposal_id: u32,
-    voter: HumanAddr,
-    fund: Coin,
+    pub proposal_id: u64,
+    pub voter: HumanAddr,
+    pub fund: Coin,
 }
+
+pub const VOTES: Map<&[u8], Vote> = Map::new(b"votes");

@@ -1,4 +1,5 @@
 use crate::error::ContractError;
+use crate::helper::extract_funding_coin;
 use cosmwasm_std::{Env, HumanAddr, MessageInfo};
 use cw0::Expiration;
 use schemars::JsonSchema;
@@ -25,18 +26,7 @@ impl InitMsg {
             return Err(ContractError::VotingPeriodExpired {});
         }
 
-        // check of funding coin_denom matches sent_funds
-        // maybe throw error when unexpected coin is found?
-        if !info
-            .sent_funds
-            .iter()
-            .any(|coin| coin.denom == self.coin_denom)
-        {
-            return Err(ContractError::ExpectedCoinNotSent {
-                coin_denom: self.coin_denom.clone(),
-            });
-        }
-
+        extract_funding_coin(&info.sent_funds, self.coin_denom.clone())?;
         Ok(())
     }
 }
@@ -57,14 +47,15 @@ impl Default for InitMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     CreateProposal {
+        title: String,
         description: String,
         metadata: String,
-        fund_address: HumanAddr
+        fund_address: HumanAddr,
+    },
+    VoteProposal {
+        proposal_id: u64,
     },
     /*
-    VoteProposal {
-        proposal_id: u32,
-    },
     TriggerDistribution {
         proposal_id: u32
     },
@@ -82,7 +73,7 @@ pub enum QueryMsg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::{coin};
+    use cosmwasm_std::coin;
     use cosmwasm_std::testing::{mock_env, mock_info};
 
     #[test]
@@ -92,7 +83,9 @@ mod tests {
         let info = mock_info("creator", &[coin(4, denom.as_str())]);
 
         env.block.height = 30;
-        let msg = InitMsg {..Default::default()};
+        let msg = InitMsg {
+            ..Default::default()
+        };
 
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);
@@ -106,7 +99,7 @@ mod tests {
         msg2.proposal_period = Expiration::AtHeight(15);
         match msg2.validate(env.clone(), info.clone()) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::ProposalPeriodExpired{}) => {}
+            Err(ContractError::ProposalPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),
         }
 
@@ -114,9 +107,8 @@ mod tests {
         msg3.coin_denom = String::from("false");
         match msg3.validate(env, info) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::ExpectedCoinNotSent{ coin_denom:_ }) => {}
+            Err(ContractError::ExpectedCoinNotSent { coin_denom: _ }) => {}
             Err(err) => println!("{:?}", err),
         }
-
     }
 }
