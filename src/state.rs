@@ -24,6 +24,8 @@ pub fn state_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
+    // set admin as single address, multisig or contract sig could be used
+    pub admin: HumanAddr,
     pub create_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,

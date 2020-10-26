@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
-    StdResult, Storage,
-};
+use cosmwasm_std::{attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, coin};
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
@@ -19,6 +16,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     msg.validate(env, info)?;
 
     let cfg = Config {
+        admin: msg.admin,
         create_proposal_whitelist: msg.create_proposal_whitelist,
         vote_proposal_whitelist: msg.vote_proposal_whitelist,
         voting_period: msg.voting_period,
@@ -45,6 +43,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             fund_address,
         } => try_create_proposal(deps, env, info, title, description, metadata, fund_address),
         HandleMsg::VoteProposal { proposal_id } => try_vote_proposal(deps, env, info, proposal_id),
+        HandleMsg::TriggerDistribution { .. } => {}
     }
 }
 
@@ -128,6 +127,39 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
         attributes: vec![
             attr("action", "vote_proposal"),
             attr("proposal_id", proposal_id),
+        ],
+        ..Default::default()
+    };
+
+    Ok(res)
+}
+
+pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    info: MessageInfo,
+) -> Result<HandleResponse, ContractError> {
+    let config = CONFIG.load(&deps.storage)?;
+    // only admin can trigger distribution
+    if info.sender != config.admin {
+        return Err(ContractError::Unauthorized {})
+    }
+    // check voting period expiration
+    if !config.voting_period.is_expired(&env.block) {
+        return Err(ContractError::VotingPeriodNotExpired {})
+    }
+
+    // quadratic funding logic goes here
+
+
+
+
+    //---------------
+
+
+    let res = HandleResponse {
+        attributes: vec![
+            attr("action", "trigger_distribution"),
         ],
         ..Default::default()
     };

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct InitMsg {
+    pub admin: HumanAddr,
     pub create_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,
@@ -55,11 +56,9 @@ pub enum HandleMsg {
     VoteProposal {
         proposal_id: u64,
     },
-    /*
     TriggerDistribution {
         proposal_id: u32
     },
-     */
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
