@@ -75,28 +75,42 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
         title,
         description,
         metadata,
-        fund_address: fund_address.clone(),
+        fund_address,
     };
     let proposal_id = create_proposal(&mut deps.storage, &proposal)?;
 
     let res = HandleResponse {
         messages: vec![],
-        attributes: vec![attr("proposal_id", proposal_id)],
+        attributes: vec![
+            attr("action", "create_proposal"),
+            attr("proposal_id", proposal_id),
+        ],
         data: Some(Binary::from(proposal_id.to_be_bytes())),
     };
 
     Ok(res)
 }
 
-/*
 pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
-    // validate sent funds and funding denom matches
     let config = CONFIG.load(&deps.storage)?;
+    // check whitelist
+    if config.vote_proposal_whitelist.is_some() {
+        let wl = config.vote_proposal_whitelist.unwrap();
+        if !wl.contains(&info.sender) {
+            return Err(ContractError::Unauthorized {});
+        }
+    }
+    // check voting expiration
+    if config.voting_period.is_expired(&env.block) {
+        return Err(ContractError::VotingPeriodExpired {});
+    }
+
+    // validate sent funds and funding denom matches
     let coin = extract_funding_coin(&info.sent_funds, config.coin_denom)?;
 
     // check proposal exists
@@ -108,17 +122,18 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
         fund: coin,
     };
 
-    VOTES.save(&mut deps.storage, &proposal_id.to_be_bytes(), &vote);
+    VOTES.save(&mut deps.storage, &proposal_id.to_be_bytes(), &vote)?;
+
     let res = HandleResponse {
-        messages: vec![],
-        attributes: vec![attr("proposal_id", proposal_id)],
-        data: Some(Binary::from(proposal_id.to_be_bytes())),
+        attributes: vec![
+            attr("action", "vote_proposal"),
+            attr("proposal_id", proposal_id),
+        ],
+        ..Default::default()
     };
 
     Ok(res)
 }
-
- */
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     _deps: &Extern<S, A, Q>,
@@ -139,7 +154,7 @@ mod tests {
     use crate::error::ContractError;
     use crate::msg::{HandleMsg, InitMsg};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Binary, Empty, HumanAddr, InitResponse};
+    use cosmwasm_std::{coin, Binary, HumanAddr};
     use cw0::Expiration;
 
     #[test]
@@ -148,7 +163,7 @@ mod tests {
         let info = mock_info("addr", &[coin(1000, "ucosm")]);
         let mut deps = mock_dependencies(&[]);
 
-        let mut init_msg = InitMsg {
+        let init_msg = InitMsg {
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
@@ -156,8 +171,7 @@ mod tests {
             coin_denom: "ucosm".to_string(),
         };
 
-        // init
-        let _ = init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
         let msg = HandleMsg::CreateProposal {
             title: String::from("test"),
             description: String::from("test"),
@@ -186,17 +200,83 @@ mod tests {
         let env = mock_env();
         let info = mock_info("true", &[coin(1000, "ucosm")]);
         let mut deps = mock_dependencies(&[]);
-        let mut init_msg = InitMsg {
+        let init_msg = InitMsg {
             create_proposal_whitelist: Some(vec![HumanAddr::from("false")]),
             ..Default::default()
         };
-        let _ = init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
 
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::Unauthorized {}) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+    }
+
+    #[test]
+    fn vote_proposal() {
+        let mut env = mock_env();
+        let info = mock_info("addr", &[coin(1000, "ucosm")]);
+        let mut deps = mock_dependencies(&[]);
+
+        let mut init_msg = InitMsg {
+            create_proposal_whitelist: None,
+            vote_proposal_whitelist: None,
+            voting_period: Expiration::AtHeight(env.block.height + 15),
+            proposal_period: Expiration::AtHeight(env.block.height + 10),
+            coin_denom: "ucosm".to_string(),
+        };
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+
+        let create_proposal_msg = HandleMsg::CreateProposal {
+            title: String::from("test"),
+            description: String::from("test"),
+            metadata: String::from("test"),
+            fund_address: HumanAddr::from("fund_address"),
+        };
+
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            info.clone(),
+            create_proposal_msg.clone(),
+        );
+        match res {
+            Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(1_u64.to_be_bytes())),
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        let msg = HandleMsg::VoteProposal { proposal_id: 1 };
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        // success case
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        // whitelist check
+        let mut deps = mock_dependencies(&[]);
+        init_msg.vote_proposal_whitelist = Some(vec![HumanAddr::from("admin")]);
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(ContractError::Unauthorized {}) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        // proposal period expired
+        let mut deps = mock_dependencies(&[]);
+        init_msg.vote_proposal_whitelist = None;
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        env.block.height = env.block.height + 15;
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(ContractError::VotingPeriodExpired {}) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
     }

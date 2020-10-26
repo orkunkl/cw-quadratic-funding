@@ -9,7 +9,7 @@ pub fn extract_funding_coin(sent_funds: &[Coin], denom: String) -> Result<Coin, 
         .map(|x| x.denom.clone())
         .position(|x| x == denom)
         .and_then(|p| sent_funds.get(p))
-        .map(|c| c.clone())
+        .cloned()
         .ok_or(ContractError::ExpectedCoinNotSent { coin_denom: denom })
 }
 
