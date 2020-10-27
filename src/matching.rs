@@ -24,12 +24,33 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
         budget: Uint128,
     ) -> StdResult<Vec<(HumanAddr, Coin)>> {
         // calculate matches sum
-        let summed = calculate_liberal_matches(grants.clone());
+        let summed = CLR::calculate_liberal_matches(grants.clone());
 
         // setup a divisor based on available match
         let divisor = budget.u128() / summed;
 
-        // multiply matched values with divisor to get match amount in range of available funds
+        let final_match = CLR::mul_matches_divisor(grants, divisor);
+
+        let res = CLR::sanitize_result(denom, final_match);
+        Ok(res)
+    }
+}
+
+
+impl CLR {
+    // takes square root of each fund, sums, then squares and returns u128
+    fn calculate_liberal_matches(grants: Vec<(Proposal, Vec<Uint128>)>) -> u128 {
+        grants
+            .iter()
+            .map(|g| {
+                let sum_sqrts: u128 = g.1.iter().map(|v| v.u128().sqrt()).sum();
+                sum_sqrts * sum_sqrts
+            })
+            .sum()
+    }
+
+    // multiply matched values with divisor to get match amount in range of available funds
+    fn mul_matches_divisor(grants: Vec<(Proposal, Vec<Uint128>)>, divisor: u128) -> Vec<(Proposal, u128)> {
         let final_match: Vec<(Proposal, u128)> = grants
             .iter()
             .map(|g| {
@@ -38,7 +59,11 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
                 (p.clone(), proposal_fund)
             })
             .collect();
+        final_match
+    }
 
+    // sanitize result for handler to process.
+    fn sanitize_result(denom: String, final_match: Vec<(Proposal, u128)>) -> Vec<(HumanAddr, Coin)> {
         let res = final_match
             .iter()
             .map(|g| {
@@ -48,18 +73,8 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
                 (fund_addr, c)
             })
             .collect();
-        Ok(res)
+        res
     }
-}
-
-fn calculate_liberal_matches(grants: Vec<(Proposal, Vec<Uint128>)>) -> u128 {
-    grants
-        .iter()
-        .map(|g| {
-            let sum_sqrts: u128 = g.1.iter().map(|v| v.u128().sqrt()).sum();
-            sum_sqrts * sum_sqrts
-        })
-        .sum()
 }
 
 #[cfg(test)]
