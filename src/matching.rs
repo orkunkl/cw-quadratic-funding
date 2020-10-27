@@ -1,13 +1,15 @@
 use crate::state::Proposal;
 use cosmwasm_std::{coin, Coin, HumanAddr, StdResult, Uint128};
-use num_integer::Roots; // this adds magic powers to u128
+use num_integer::Roots;
+use std::convert::TryInto;
+use crate::error::ContractError; // this adds magic powers to u128
 
 trait QuadraticFundingMatchingAlgorithm {
     fn distribute(
         &self,
         grants: Vec<(Proposal, Vec<Uint128>)>,
         denom: String,
-        budget: Uint128,
+        budget: Option<Uint128>,
     ) -> StdResult<Vec<(HumanAddr, Coin)>>;
 }
 
@@ -19,8 +21,13 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
         &self,
         grants: Vec<(Proposal, Vec<Uint128>)>,
         denom: String,
-        budget: Uint128,
-    ) -> StdResult<Vec<(HumanAddr, Coin)>> {
+        budget: Option<Uint128>,
+    ) -> Result<Vec<(HumanAddr, Coin)>, ContractError> {
+        // clr algorithm works with budget constrain
+        if budget.is_none() {
+            Err(ContractError::CLRConstrainRequired {})
+        }
+
         // calculate matches sum
         let summed = CLR::calculate_matched_sum(grants.clone());
 
