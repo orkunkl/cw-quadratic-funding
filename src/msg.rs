@@ -35,6 +35,7 @@ impl InitMsg {
 impl Default for InitMsg {
     fn default() -> Self {
         InitMsg {
+            admin: Default::default(),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Default::default(),
@@ -57,7 +58,7 @@ pub enum HandleMsg {
         proposal_id: u64,
     },
     TriggerDistribution {
-        proposal_id: u32
+        proposal_id: u32,
     },
 }
 

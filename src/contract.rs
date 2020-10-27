@@ -1,4 +1,7 @@
-use cosmwasm_std::{attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, coin};
+use cosmwasm_std::{
+    attr, coin, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo,
+    Querier, StdResult, Storage,
+};
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
@@ -43,7 +46,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             fund_address,
         } => try_create_proposal(deps, env, info, title, description, metadata, fund_address),
         HandleMsg::VoteProposal { proposal_id } => try_vote_proposal(deps, env, info, proposal_id),
-        HandleMsg::TriggerDistribution { .. } => {}
+        HandleMsg::TriggerDistribution { .. } => Ok(HandleResponse::default()),
     }
 }
 
@@ -142,25 +145,19 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     let config = CONFIG.load(&deps.storage)?;
     // only admin can trigger distribution
     if info.sender != config.admin {
-        return Err(ContractError::Unauthorized {})
+        return Err(ContractError::Unauthorized {});
     }
     // check voting period expiration
     if !config.voting_period.is_expired(&env.block) {
-        return Err(ContractError::VotingPeriodNotExpired {})
+        return Err(ContractError::VotingPeriodNotExpired {});
     }
 
     // quadratic funding logic goes here
 
-
-
-
     //---------------
 
-
     let res = HandleResponse {
-        attributes: vec![
-            attr("action", "trigger_distribution"),
-        ],
+        attributes: vec![attr("action", "trigger_distribution")],
         ..Default::default()
     };
 
@@ -196,6 +193,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
+            admin: Default::default(),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
@@ -254,6 +252,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
+            admin: Default::default(),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
