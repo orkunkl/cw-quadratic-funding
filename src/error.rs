@@ -22,5 +22,5 @@ pub enum ContractError {
     ExpectedCoinNotSent { coin_denom: String },
 
     #[error("CLR algorithm requires a budget constrain")]
-    CLRConstrainRequired{ },
+    CLRConstrainRequired {},
 }
