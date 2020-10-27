@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, coin, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo,
-    Querier, StdResult, Storage,
+    attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
+    StdResult, Storage,
 };
 
 use crate::error::ContractError;

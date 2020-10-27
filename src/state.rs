@@ -43,6 +43,16 @@ pub struct Proposal {
     pub fund_address: HumanAddr,
 }
 
+impl Default for Proposal {
+    fn default() -> Self {
+        Proposal {
+            title: "title".to_string(),
+            description: "desc".to_string(),
+            metadata: "dec".to_string(),
+            fund_address: Default::default(),
+        }
+    }
+}
 pub const PROPOSALS: Map<&[u8], Proposal> = Map::new(b"proposal");
 pub const PROPOSAL_SEQ: &[u8] = b"proposal_seq";
 

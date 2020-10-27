@@ -1,7 +1,5 @@
-use crate::state::{Proposal, Vote, PROPOSALS};
-use cosmwasm_std::{
-    coin, Api, Coin, Extern, HumanAddr, Order, Querier, StdResult, Storage, Uint128,
-};
+use crate::state::Proposal;
+use cosmwasm_std::{coin, Coin, HumanAddr, StdResult, Uint128};
 use num_integer::Roots; // this adds magic powers to u128
 
 trait QuadraticFundingMatchingAlgorithm {
@@ -24,7 +22,7 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
         budget: Uint128,
     ) -> StdResult<Vec<(HumanAddr, Coin)>> {
         // calculate matches sum
-        let summed = CLR::calculate_liberal_matches(grants.clone());
+        let summed = CLR::calculate_matched_sum(grants.clone());
 
         // setup a divisor based on available match
         let divisor = budget.u128() / summed;
@@ -36,52 +34,71 @@ impl QuadraticFundingMatchingAlgorithm for CLR {
     }
 }
 
-
 impl CLR {
     // takes square root of each fund, sums, then squares and returns u128
-    fn calculate_liberal_matches(grants: Vec<(Proposal, Vec<Uint128>)>) -> u128 {
-        grants
-            .iter()
-            .map(|g| {
-                let sum_sqrts: u128 = g.1.iter().map(|v| v.u128().sqrt()).sum();
-                sum_sqrts * sum_sqrts
-            })
-            .sum()
+    fn calculate_matched_sum(grants: Vec<(Proposal, Vec<Uint128>)>) -> u128 {
+        let mut sum = 0u128;
+        for g in grants {
+            for vote in g.1 {
+                sum += vote.u128().sqrt()
+            }
+        }
+        sum * sum
     }
 
     // multiply matched values with divisor to get match amount in range of available funds
-    fn mul_matches_divisor(grants: Vec<(Proposal, Vec<Uint128>)>, divisor: u128) -> Vec<(Proposal, u128)> {
-        let final_match: Vec<(Proposal, u128)> = grants
+    fn mul_matches_divisor(
+        grants: Vec<(Proposal, Vec<Uint128>)>,
+        divisor: u128,
+    ) -> Vec<(Proposal, u128)> {
+        grants
             .iter()
             .map(|g| {
                 let (p, vs) = g;
                 let proposal_fund: u128 = vs.iter().map(|v| v.u128() * divisor).sum();
                 (p.clone(), proposal_fund)
             })
-            .collect();
-        final_match
+            .collect()
     }
 
     // sanitize result for handler to process.
-    fn sanitize_result(denom: String, final_match: Vec<(Proposal, u128)>) -> Vec<(HumanAddr, Coin)> {
-        let res = final_match
+    fn sanitize_result(
+        denom: String,
+        final_match: Vec<(Proposal, u128)>,
+    ) -> Vec<(HumanAddr, Coin)> {
+        final_match
             .iter()
             .map(|g| {
                 let (p, f) = g;
                 let fund_addr = p.clone().fund_address;
-                let c = coin(f.clone(), denom.as_str());
+                let c = coin(*f, denom.as_str());
                 (fund_addr, c)
             })
-            .collect();
-        res
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::matching::calculate_liberal_matches;
-    use crate::state::{Proposal, Vote};
-    use cosmwasm_std::{Coin, HumanAddr, Uint128};
+    use crate::matching::CLR;
+    use crate::state::Proposal;
+    use cosmwasm_std::Uint128;
+
+    #[test]
+    fn test_calculate_liberal_matches() {
+        let proposal1 = Proposal {
+            ..Default::default()
+        };
+        let proposal2 = Proposal {
+            ..Default::default()
+        };
+        let grants = vec![
+            (proposal1, vec![Uint128(30000000)]),
+            (proposal2, vec![Uint128(1000)]),
+        ];
+        let lm = CLR::calculate_matched_sum(grants);
+        assert_eq!(lm, 30338064u128)
+    }
     /*
        #[test]
        fn test_aggregate_funding_round_grants() {
@@ -177,31 +194,6 @@ mod tests {
            assert_eq!(sum, expected)
        }
 
-       #[test]
-       fn test_calculate_liberal_matches() {
-           let proposal1 = Proposal {
-               title: String::from("proposal 1"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address1"),
-           };
-           let proposal2 = Proposal {
-               title: String::from("proposal 1"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address1"),
-           };
-           let grants = vec![
-               (proposal1.clone(), Uint128(3000)),
-                   (proposal2.clone(), Uint128(1000))
-           ];
-           let expected = vec![
-               (proposal1, 129),
-               (proposal2, 129),
-           ];
-           let lm = calculate_liberal_matches(grants);
-           assert_eq!(lm, expected)
-       }
 
     */
 }

@@ -5,33 +5,80 @@
     {
       "type": "object",
       "required": [
-        "increment"
+        "create_proposal"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "create_proposal": {
+          "type": "object",
+          "required": [
+            "description",
+            "fund_address",
+            "metadata",
+            "title"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "fund_address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "metadata": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     {
       "type": "object",
       "required": [
-        "reset"
+        "vote_proposal"
       ],
       "properties": {
-        "reset": {
+        "vote_proposal": {
           "type": "object",
           "required": [
-            "count"
+            "proposal_id"
           ],
           "properties": {
-            "count": {
+            "proposal_id": {
               "type": "integer",
-              "format": "int32"
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "trigger_distribution"
+      ],
+      "properties": {
+        "trigger_distribution": {
+          "type": "object",
+          "required": [
+            "proposal_id"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             }
           }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }
