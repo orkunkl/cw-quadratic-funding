@@ -4,12 +4,13 @@ use cosmwasm_std::{coin, Coin, HumanAddr};
 use num_integer::Roots;
 
 trait QFAlgorithm {
+    // takes grantes denom and budget, returns "fund_address" -> "grant" vector and left over tokens to return
     fn distribute(
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
         denom: String,
         budget: Option<u128>,
-    ) -> Result<Vec<(HumanAddr, Coin)>, ContractError>;
+    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError>;
 }
 
 struct CLR;
@@ -21,7 +22,7 @@ impl QFAlgorithm for CLR {
         grants: Vec<(Proposal, Vec<u128>)>,
         denom: String,
         budget: Option<u128>,
-    ) -> Result<Vec<(HumanAddr, Coin)>, ContractError> {
+    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
         // clr algorithm works with budget constrain
         if budget.is_none() {
             return Err(ContractError::CLRConstrainRequired {});
@@ -29,12 +30,16 @@ impl QFAlgorithm for CLR {
 
         // calculate matches sum
         let matched = CLR::calculate_matched_sum(grants.clone());
-        // setup a divisor based on available match
 
+        // constraint the grants by budget
         let constrained = CLR::constrain_by_budget(matched, budget.unwrap());
 
+        // calculate leftover
+        let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
+        let leftover = coin(budget.unwrap() - constrained_sum, denom.as_str());
+        // sanitize result
         let res = CLR::sanitize_result(denom, constrained);
-        Ok(res)
+        Ok((res, leftover))
     }
 }
 
@@ -83,7 +88,7 @@ mod tests {
     use cosmwasm_std::{coin, HumanAddr};
 
     #[test]
-    fn test_clr() {
+    fn test_clr_1() {
         let algo = CLR {};
         let proposal1 = Proposal {
             fund_address: HumanAddr::from("proposal1"),
@@ -120,123 +125,63 @@ mod tests {
         ];
         let res = algo.distribute(grants, String::from("ucosm"), Some(1000000u128));
         match res {
-            Ok(o) => assert_eq!(o, expected),
+            Ok(o) => {
+            assert_eq!(o.0, expected);
+            assert_eq!(o.1, coin(1, "ucosm"))
+            },
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
     }
-    /*
+
+    // values got from https://wtfisqf.com/?grant=1200,44999,33&grant=30000,58999&grant=230000,100&grant=100000,5&match=550000
+    //        expected   got
+    // grant1 60673.38   60212
+    // grant2 164749.05  164602
+    // grant3 228074.05  228537
+    // grant4 96503.53   96648
     #[test]
-    fn test_calculate_liberal_matches() {
+    fn test_clr_2() {
+        let algo = CLR {};
         let proposal1 = Proposal {
+            fund_address: HumanAddr::from("proposal1"),
             ..Default::default()
         };
         let proposal2 = Proposal {
+            fund_address: HumanAddr::from("proposal2"),
             ..Default::default()
         };
+        let proposal3 = Proposal {
+            fund_address: HumanAddr::from("proposal3"),
+            ..Default::default()
+        };
+        let proposal4 = Proposal {
+            fund_address: HumanAddr::from("proposal4"),
+            ..Default::default()
+        };
+        let votes1 = vec![1200u128, 44999u128, 33u128];
+        let votes2 = vec![30000u128, 58999u128];
+        let votes3 = vec![230000u128, 100u128];
+        let votes4 = vec![100000u128, 5u128];
+
         let grants = vec![
-            (proposal1, vec![30000000u128]),
-            (proposal2.clone(), vec![40000000u128]),
+            (proposal1.clone(), votes1),
+            (proposal2.clone(), votes2),
+            (proposal3.clone(), votes3),
+            (proposal4.clone(), votes4),
         ];
-        let lm = CLR::calculate_matched_sum(grants);
-        assert_eq!(lm, 157452304u128)
+        let expected = vec![
+            (proposal1.fund_address, coin(60212u128, "ucosm")),
+            (proposal2.fund_address, coin(164602u128, "ucosm")),
+            (proposal3.fund_address, coin(228537u128, "ucosm")),
+            (proposal4.fund_address, coin(96648u128, "ucosm")),
+        ];
+        let res = algo.distribute(grants, String::from("ucosm"), Some(550000u128));
+        match res {
+            Ok(o) => {
+                assert_eq!(o.0, expected);
+                assert_eq!(o.1, coin(1, "ucosm"))
+            }
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
     }
-
-     */
-    /*
-       #[test]
-       fn test_aggregate_funding_round_grants() {
-           let proposal1 = Proposal {
-               title: String::from("proposal 1"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address1"),
-           };
-           let votes1 = vec![
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address1"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(1000),
-                   },
-               },
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address2"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(2000),
-                   },
-               },
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address3"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(3000),
-                   },
-               },
-           ];
-           let proposal2 = Proposal {
-               title: String::from("proposal 2"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address2"),
-           };
-           let votes2 = vec![
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address4"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(4000),
-                   },
-               },
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address5"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(5000),
-                   },
-               },
-               Vote {
-                   proposal_id: 0,
-                   voter: HumanAddr::from("address6"),
-                   fund: Coin {
-                       denom: String::from("ucosm"),
-                       amount: Uint128(5000),
-                   },
-               },
-           ];
-           let grants = vec![(proposal1.clone(), votes1), (proposal2.clone(), votes2)];
-           let expected = vec![(proposal1, Uint128(6000)), (proposal2, Uint128(14000))];
-           let sum = aggregate_funding_round_grants(grants);
-           assert_eq!(sum, expected);
-       }
-
-       #[test]
-       fn test_sum_funding_round_grants() {
-           let proposal1 = Proposal {
-               title: String::from("proposal 1"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address1"),
-           };
-           let total_grant1 = Uint128(12000);
-           let proposal2 = Proposal {
-               title: String::from("proposal 1"),
-               description: String::from("desc"),
-               metadata: String::from(""),
-               fund_address: HumanAddr::from("fund_address1"),
-           };
-           let total_grant2 = Uint128(12000);
-           let expected = total_grant1 + total_grant2;
-           let sum =
-               sum_total_round_grants(vec![(proposal1, total_grant1), (proposal2, total_grant2)]);
-           assert_eq!(sum, expected)
-       }
-
-
-    */
 }
