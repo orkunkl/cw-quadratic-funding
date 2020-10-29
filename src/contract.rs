@@ -1,9 +1,9 @@
-use cosmwasm_std::{attr, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, to_binary};
+use cosmwasm_std::{attr, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, AllBalanceResponse};
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
 use crate::matching::{QFAlgorithm, CLR};
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg, AllProposalsResponse};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
 
@@ -45,7 +45,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             metadata,
             fund_address,
         } => handle_create_proposal(deps, env, info, title, description, metadata, fund_address),
-        HandleMsg::VoteProposal { proposal_id } => handle_vote_proposal(deps, env, info, proposal_id),
+        HandleMsg::VoteProposal { proposal_id } => {
+            handle_vote_proposal(deps, env, info, proposal_id)
+        }
         HandleMsg::TriggerDistribution { .. } => handle_trigger_distribution(deps, env, info),
     }
 }
@@ -228,7 +230,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::ProposalByID { id } => to_binary(&query_proposal_id(deps, id)?),
-        _ => unimplemented!()
+        QueryMsg::AllProposals { } => to_binary(&query_all_proposals(deps)?)
     }
 }
 
@@ -239,15 +241,32 @@ fn query_proposal_id<S: Storage, A: Api, Q: Querier>(
     PROPOSALS.load(&deps.storage, &id.to_be_bytes())
 }
 
+fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<AllProposalsResponse> {
+    let all: StdResult<Vec<(Vec<u8>, Proposal)>> = PROPOSALS
+        .range(&deps.storage, None, None, Order::Ascending)
+        .collect();
+    all.map(|p| {
+        Iterator
+        let res = p.concat();
+        AllProposalsResponse{
+            proposals: res
+        }
+    })
+
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, query_proposal_id};
+    use crate::contract::{handle, init, query_proposal_id, query_all_proposals};
     use crate::error::ContractError;
-    use crate::msg::{HandleMsg, InitMsg};
+    use crate::msg::{HandleMsg, InitMsg, AllProposalsResponse};
+    use crate::state::{Proposal, PROPOSALS};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, BankMsg, Binary, CosmosMsg, HumanAddr};
     use cw0::Expiration;
-    use crate::state::{PROPOSALS, Proposal};
+    use crate::msg::QueryMsg::AllProposals;
 
     #[test]
     fn create_proposal() {
@@ -535,7 +554,7 @@ mod tests {
 
     #[test]
     fn query_proposal() {
-        let mut deps= mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let proposal = Proposal {
             id: 1,
@@ -552,5 +571,34 @@ mod tests {
         }
         let res = query_proposal_id(&deps, 1).unwrap();
         assert_eq!(proposal, res);
+    }
+
+    #[test]
+    fn query_all_proposal() {
+        let mut deps = mock_dependencies(&[]);
+
+        let proposal = Proposal {
+            id: 1,
+            title: "title".to_string(),
+            description: "desc".to_string(),
+            metadata: None,
+            fund_address: Default::default(),
+        };
+        PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
+
+        let proposal1 = Proposal {
+            id: 2,
+            title: "title 2".to_string(),
+            description: "desc".to_string(),
+            metadata: None,
+            fund_address: Default::default(),
+        };
+        PROPOSALS.save(&mut deps.storage, &2_u64.to_be_bytes(), &proposal1);
+
+
+
+        let res = query_all_proposals(&deps).unwrap();
+
+        assert_eq!(AllProposalsResponse{ proposals: vec![proposal, proposal1] }, res);
     }
 }

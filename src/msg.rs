@@ -4,6 +4,7 @@ use cosmwasm_std::{Binary, Env, HumanAddr, MessageInfo};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use crate::state::Proposal;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -62,8 +63,12 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     ProposalByID { id: u64 },
-    ProposalByFundAddress { fund_address: HumanAddr },
     AllProposals {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AllProposalsResponse {
+    pub proposals: Vec<Proposal>,
 }
 
 #[cfg(test)]
