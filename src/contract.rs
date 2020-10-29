@@ -337,6 +337,14 @@ mod tests {
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
 
+        // double vote prevention
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(ContractError::AddressAlreadyVotedProject {}) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
         // whitelist check
         let mut deps = mock_dependencies(&[]);
         init_msg.vote_proposal_whitelist = Some(vec![HumanAddr::from("admin")]);
