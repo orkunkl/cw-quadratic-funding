@@ -47,13 +47,13 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             description,
             metadata,
             fund_address,
-        } => try_create_proposal(deps, env, info, title, description, metadata, fund_address),
-        HandleMsg::VoteProposal { proposal_id } => try_vote_proposal(deps, env, info, proposal_id),
-        HandleMsg::TriggerDistribution { .. } => try_trigger_distribution(deps, env, info),
+        } => handle_create_proposal(deps, env, info, title, description, metadata, fund_address),
+        HandleMsg::VoteProposal { proposal_id } => handle_vote_proposal(deps, env, info, proposal_id),
+        HandleMsg::TriggerDistribution { .. } => handle_trigger_distribution(deps, env, info),
     }
 }
 
-pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
+pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
@@ -99,19 +99,21 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
+pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
+
     // check whitelist
     if let Some(wl) = config.vote_proposal_whitelist {
         if !wl.contains(&info.sender) {
             return Err(ContractError::Unauthorized {});
         }
     }
+
     // check voting expiration
     if config.voting_period.is_expired(&env.block) {
         return Err(ContractError::VotingPeriodExpired {});
@@ -140,6 +142,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     if vote.may_load(&deps.storage)?.is_some() {
         return Err(ContractError::AddressAlreadyVotedProject {});
     }
+
     // save vote
     vote.save(&mut deps.storage, &data)?;
 
@@ -154,16 +157,18 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
+pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
+
     // only admin can trigger distribution
     if deps.api.canonical_address(&info.sender)? != config.admin {
         return Err(ContractError::Unauthorized {});
     }
+
     // check voting period expiration
     if !config.voting_period.is_expired(&env.block) {
         return Err(ContractError::VotingPeriodNotExpired {});
@@ -181,6 +186,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
             .prefix(&p.id.to_be_bytes())
             .range(&deps.storage, None, None, Order::Ascending)
             .collect();
+
         let mut votes: Vec<u128> = vec![];
         for v in vote_query? {
             votes.push(v.1.fund.amount.u128());
@@ -188,7 +194,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         grants.push((p, votes));
     }
 
-    // TODO make this algorithm customizable
+    // TODO make customizable
     let algo = QFAlgorithm { algo: CLR {} };
     let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
 
@@ -207,12 +213,14 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         to_address: deps.api.human_address(&config.admin)?,
         amount: vec![leftover],
     });
+
     msgs.push(leftover_msg);
     let res = HandleResponse {
         messages: msgs,
         attributes: vec![attr("action", "trigger_distribution")],
         data: None,
     };
+
     Ok(res)
 }
 
