@@ -63,6 +63,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
     fund_address: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
+
     // check whitelist
     if let Some(wl) = config.create_proposal_whitelist {
         if !wl.contains(&info.sender) {
@@ -184,6 +185,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         grants.push((p, votes));
     }
 
+    // TODO make this algorithm customizable
     let algo = QFAlgorithm { algo: CLR {} };
     let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
 
@@ -248,7 +250,6 @@ mod tests {
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
-            coin_denom: "ucosm".to_string(),
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -307,7 +308,6 @@ mod tests {
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
-            coin_denom: "ucosm".to_string(),
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
