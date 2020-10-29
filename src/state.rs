@@ -30,7 +30,6 @@ pub struct Config {
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
-    pub coin_denom: String,
     pub budget: Coin,
 }
 

@@ -20,14 +20,13 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 ) -> Result<InitResponse, ContractError> {
     msg.validate(env, &info)?;
 
-    let budget = extract_funding_coin(info.sent_funds.as_slice(), msg.coin_denom.clone())?;
+    let budget = extract_funding_coin(info.sent_funds.as_slice())?;
     let cfg = Config {
         admin: msg.admin,
         create_proposal_whitelist: msg.create_proposal_whitelist,
         vote_proposal_whitelist: msg.vote_proposal_whitelist,
         voting_period: msg.voting_period,
         proposal_period: msg.proposal_period,
-        coin_denom: msg.coin_denom,
         budget,
     };
     CONFIG.save(&mut deps.storage, &cfg)?;
@@ -115,7 +114,10 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     }
 
     // validate sent funds and funding denom matches
-    let coin = extract_funding_coin(&info.sent_funds, config.coin_denom)?;
+    let fund= extract_funding_coin(&info.sent_funds)?;
+    if fund.denom != config.budget.denom {
+        return Err(ContractError::WrongFundCoin { expected: config.budget.denom, got: fund.denom });
+    }
 
     // check proposal exists
     PROPOSALS.load(&deps.storage, &proposal_id.to_be_bytes())?;
@@ -123,7 +125,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     let data = Vote {
         proposal_key: proposal_id,
         voter: info.sender.clone(),
-        fund: coin,
+        fund,
     };
 
     // check sender did not voted on proposal

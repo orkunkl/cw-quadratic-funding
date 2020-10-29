@@ -27,7 +27,7 @@ impl InitMsg {
             return Err(ContractError::VotingPeriodExpired {});
         }
 
-        extract_funding_coin(&info.sent_funds, self.coin_denom.clone())?;
+        extract_funding_coin(&info.sent_funds)?;
         Ok(())
     }
 }
@@ -105,7 +105,7 @@ mod tests {
         msg3.coin_denom = String::from("false");
         match msg3.validate(env, &info) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::ExpectedCoinNotSent { coin_denom: _ }) => {}
+            Err(ContractError::MultipleCoinsSent{ }) => {}
             Err(err) => println!("{:?}", err),
         }
     }
