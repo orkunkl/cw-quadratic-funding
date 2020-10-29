@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, HumanAddr, Storage};
+use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map};
@@ -9,7 +9,7 @@ use cw_storage_plus::{Item, Map};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     // set admin as single address, multisig or contract sig could be used
-    pub admin: HumanAddr,
+    pub admin: CanonicalAddr,
     pub create_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,
@@ -25,7 +25,7 @@ pub struct Proposal {
     pub title: String,
     pub description: String,
     pub metadata: String,
-    pub fund_address: HumanAddr,
+    pub fund_address: CanonicalAddr,
 }
 
 impl Default for Proposal {
@@ -49,7 +49,7 @@ pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Vote {
     pub proposal_id: u64,
-    pub voter: HumanAddr,
+    pub voter: CanonicalAddr,
     pub fund: Coin,
 }
 

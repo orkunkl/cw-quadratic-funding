@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use crate::state::Proposal;
-use cosmwasm_std::{coin, Coin, HumanAddr};
+use cosmwasm_std::{coin, CanonicalAddr, Coin};
 use num_integer::Roots;
 
 pub struct QFAlgorithm<S> {
@@ -15,7 +15,7 @@ where
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
         budget: Option<Coin>,
-    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
+    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError> {
         self.algo.distribute(grants, budget)
     }
 }
@@ -26,7 +26,7 @@ pub trait Algo {
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
         budget: Option<Coin>,
-    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError>;
+    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError>;
 }
 
 pub struct CLR;
@@ -37,7 +37,7 @@ impl Algo for CLR {
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
         budget: Option<Coin>,
-    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
+    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError> {
         // clr algorithm works with budget constrain
         if let Some(budget) = budget {
             // calculate matches sum
@@ -90,7 +90,7 @@ impl CLR {
     fn sanitize_result(
         denom: String,
         final_match: Vec<(Proposal, u128)>,
-    ) -> Vec<(HumanAddr, Coin)> {
+    ) -> Vec<(CanonicalAddr, Coin)> {
         final_match
             .iter()
             .map(|g| {
@@ -107,24 +107,24 @@ impl CLR {
 mod tests {
     use crate::matching::{QFAlgorithm, CLR};
     use crate::state::Proposal;
-    use cosmwasm_std::{coin, HumanAddr};
+    use cosmwasm_std::{coin, CanonicalAddr};
 
     #[test]
     fn test_clr_1() {
         let proposal1 = Proposal {
-            fund_address: HumanAddr::from("proposal1"),
+            fund_address: CanonicalAddr(b"proposal1".to_vec().into()),
             ..Default::default()
         };
         let proposal2 = Proposal {
-            fund_address: HumanAddr::from("proposal2"),
+            fund_address: CanonicalAddr(b"proposal2".to_vec().into()),
             ..Default::default()
         };
         let proposal3 = Proposal {
-            fund_address: HumanAddr::from("proposal3"),
+            fund_address: CanonicalAddr(b"proposal3".to_vec().into()),
             ..Default::default()
         };
         let proposal4 = Proposal {
-            fund_address: HumanAddr::from("proposal4"),
+            fund_address: CanonicalAddr(b"proposal4".to_vec().into()),
             ..Default::default()
         };
         let votes1 = vec![7200u128];
@@ -149,7 +149,7 @@ mod tests {
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);
-                assert_eq!(o.1, coin(1, "ucosm"))
+                assert_eq!(o.1, coin(2, "ucosm"))
             }
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
@@ -164,19 +164,19 @@ mod tests {
     #[test]
     fn test_clr_2() {
         let proposal1 = Proposal {
-            fund_address: HumanAddr::from("proposal1"),
+            fund_address: CanonicalAddr(b"proposal1".to_vec().into()),
             ..Default::default()
         };
         let proposal2 = Proposal {
-            fund_address: HumanAddr::from("proposal2"),
+            fund_address: CanonicalAddr(b"proposal2".to_vec().into()),
             ..Default::default()
         };
         let proposal3 = Proposal {
-            fund_address: HumanAddr::from("proposal3"),
+            fund_address: CanonicalAddr(b"proposal3".to_vec().into()),
             ..Default::default()
         };
         let proposal4 = Proposal {
-            fund_address: HumanAddr::from("proposal4"),
+            fund_address: CanonicalAddr(b"proposal4".to_vec().into()),
             ..Default::default()
         };
         let votes1 = vec![1200u128, 44999u128, 33u128];

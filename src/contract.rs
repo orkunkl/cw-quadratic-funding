@@ -22,7 +22,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     let budget = extract_funding_coin(info.sent_funds.as_slice())?;
     let cfg = Config {
-        admin: msg.admin,
+        admin: deps.api.canonical_address(&msg.admin)?,
         create_proposal_whitelist: msg.create_proposal_whitelist,
         vote_proposal_whitelist: msg.vote_proposal_whitelist,
         voting_period: msg.voting_period,
@@ -82,7 +82,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
         title,
         description,
         metadata,
-        fund_address,
+        fund_address: deps.api.canonical_address(&fund_address)?,
     };
     PROPOSALS.save(&mut deps.storage, &id.to_be_bytes(), &p)?;
 
@@ -128,7 +128,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
 
     let data = Vote {
         proposal_id,
-        voter: info.sender.clone(),
+        voter: deps.api.canonical_address(&info.sender)?,
         fund,
     };
 
@@ -158,7 +158,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // only admin can trigger distribution
-    if info.sender != config.admin {
+    if deps.api.canonical_address(&info.sender)? != config.admin {
         return Err(ContractError::Unauthorized {});
     }
     // check voting period expiration
@@ -189,26 +189,24 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     let algo = QFAlgorithm { algo: CLR {} };
     let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
 
-    let mut distr_funds_msg: Vec<CosmosMsg> = distr_funds
-        .iter()
-        .map(|f| {
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: env.contract.address.clone(),
-                to_address: f.clone().0,
-                amount: vec![f.clone().1],
-            })
-        })
-        .collect();
+    let mut msgs = vec![];
+    for f in distr_funds {
+        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+            from_address: env.contract.address.clone(),
+            to_address: deps.api.human_address(&f.0)?,
+            amount: vec![f.clone().1],
+        }));
+    }
 
     let leftover_msg: CosmosMsg = CosmosMsg::Bank(BankMsg::Send {
         from_address: env.contract.address,
         // TODO: send to funder addr
-        to_address: config.admin,
+        to_address: deps.api.human_address(&config.admin)?,
         amount: vec![leftover],
     });
-    distr_funds_msg.push(leftover_msg);
+    msgs.push(leftover_msg);
     let res = HandleResponse {
-        messages: distr_funds_msg,
+        messages: msgs,
         attributes: vec![attr("action", "trigger_distribution")],
         data: None,
     };
