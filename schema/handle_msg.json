@@ -47,7 +47,7 @@
           "properties": {
             "proposal_id": {
               "type": "integer",
-              "format": "uint64",
+              "format": "uint8",
               "minimum": 0.0
             }
           }
@@ -61,17 +61,7 @@
       ],
       "properties": {
         "trigger_distribution": {
-          "type": "object",
-          "required": [
-            "proposal_id"
-          ],
-          "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
+          "type": "object"
         }
       }
     }

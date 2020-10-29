@@ -19,7 +19,8 @@ where
         self.algo.distribute(grants, budget)
     }
 }
-trait Algo {
+
+pub trait Algo {
     // takes grantes denom and budget, returns "fund_address" -> "grant" vector and left over tokens to return
     fn distribute(
         &self,
@@ -38,25 +39,25 @@ impl Algo for CLR {
         budget: Option<Coin>,
     ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
         // clr algorithm works with budget constrain
-        if budget.is_none() {
-            return Err(ContractError::CLRConstrainRequired {});
+        if let Some(budget) = budget {
+            // calculate matches sum
+            let matched = CLR::calculate_matched_sum(grants);
+
+            // constraint the grants by budget
+            let constrained = CLR::constrain_by_budget(matched, budget.amount.u128());
+
+            // calculate leftover
+            let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
+            let leftover = coin(
+                budget.amount.u128() - constrained_sum,
+                budget.denom.as_str(),
+            );
+            // sanitize result
+            let res = CLR::sanitize_result(budget.denom, constrained);
+            Ok((res, leftover))
+        } else {
+            Err(ContractError::CLRConstrainRequired {})
         }
-
-        // calculate matches sum
-        let matched = CLR::calculate_matched_sum(grants.clone());
-
-        // constraint the grants by budget
-        let constrained = CLR::constrain_by_budget(matched, budget.unwrap().clone().u128());
-
-        // calculate leftover
-        let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
-        let leftover = coin(
-            budget.unwrap().amount.u128() - constrained_sum,
-            budget.unwrap().denom.as_str(),
-        );
-        // sanitize result
-        let res = CLR::sanitize_result(budget.unwrap().denom, constrained);
-        Ok((res, leftover))
     }
 }
 

@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vote",
+  "type": "object",
+  "required": [
+    "fund",
+    "proposal_key",
+    "voter"
+  ],
+  "properties": {
+    "fund": {
+      "$ref": "#/definitions/Coin"
+    },
+    "proposal_key": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "voter": {
+      "$ref": "#/definitions/HumanAddr"
+    }
+  },
+  "definitions": {
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

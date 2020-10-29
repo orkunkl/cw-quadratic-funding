@@ -87,7 +87,7 @@ mod tests {
 
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);
-        match msg1.validate(env.clone(), &info){
+        match msg1.validate(env.clone(), &info) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::VotingPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),

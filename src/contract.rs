@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order,
-    Querier, StdResult, Storage,
+    attr, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, Order, Querier, StdResult, Storage,
 };
 
 use crate::error::ContractError;
@@ -9,8 +9,6 @@ use crate::matching::{QFAlgorithm, CLR};
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
-use cw_storage_plus::Bound;
-use std::sync::atomic::Ordering;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -151,7 +149,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<HandleResponse<BankMsg>, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // only admin can trigger distribution
     if info.sender != config.admin {
@@ -170,7 +168,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
     for p in proposals {
-        let vote_query: StdResult<Vec<(Vec<u8>,Vote)>> = VOTES
+        let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
             .prefix(&[p.id])
             .range(&deps.storage, None, None, Order::Ascending)
             .collect();
@@ -182,10 +180,30 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     }
 
     let algo = QFAlgorithm { algo: CLR {} };
-    algo.distribute(grants, Some(config.budget));
+    let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
+
+    let mut distr_funds_msg: Vec<CosmosMsg<BankMsg>> = distr_funds
+        .iter()
+        .map(|f| {
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: f.clone().0,
+                amount: vec![f.clone().1],
+            })
+        })
+        .collect();
+
+    let leftover_msg: CosmosMsg<BankMsg> = CosmosMsg::Bank(BankMsg::Send {
+        from_address: env.contract.address,
+        // TODO: send to funder addr
+        to_address: config.admin,
+        amount: vec![leftover],
+    });
+    distr_funds_msg.push(leftover_msg);
     let res = HandleResponse {
+        messages: distr_funds_msg,
         attributes: vec![attr("action", "trigger_distribution")],
-        ..Default::default()
+        data: None,
     };
 
     Ok(res)

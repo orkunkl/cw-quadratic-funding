@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proposal",
+  "type": "object",
+  "required": [
+    "description",
+    "fund_address",
+    "id",
+    "metadata",
+    "title"
+  ],
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "fund_address": {
+      "$ref": "#/definitions/HumanAddr"
+    },
+    "id": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
+    },
+    "metadata": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
+}
