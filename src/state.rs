@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage, Binary};
+use cosmwasm_std::{Binary, CanonicalAddr, Coin, HumanAddr, Storage};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map};

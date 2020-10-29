@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
-use cosmwasm_std::{Env, HumanAddr, MessageInfo, Binary};
+use cosmwasm_std::{Binary, Env, HumanAddr, MessageInfo};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

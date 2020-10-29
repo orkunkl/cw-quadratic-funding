@@ -79,7 +79,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
     let id = nextval(&mut proposal_seq(&mut deps.storage))?;
     let p = Proposal {
         id,
-        title,
+        title: title.clone(),
         description,
         metadata,
         fund_address: deps.api.canonical_address(&fund_address)?,
@@ -88,7 +88,11 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        attributes: vec![attr("action", "create_proposal"), attr("proposal_id", id)],
+        attributes: vec![
+            attr("action", "create_proposal"),
+            attr("title", title),
+            attr("proposal_id", id),
+        ],
         data: Some(Binary::from(id.to_be_bytes())),
     };
 
@@ -103,8 +107,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // check whitelist
-    if config.vote_proposal_whitelist.is_some() {
-        let wl = config.vote_proposal_whitelist.unwrap();
+    if let Some(wl) = config.vote_proposal_whitelist {
         if !wl.contains(&info.sender) {
             return Err(ContractError::Unauthorized {});
         }

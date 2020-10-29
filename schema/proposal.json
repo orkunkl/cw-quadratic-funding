@@ -6,7 +6,6 @@
     "description",
     "fund_address",
     "id",
-    "metadata",
     "title"
   ],
   "properties": {
@@ -22,7 +21,14 @@
       "minimum": 0.0
     },
     "metadata": {
-      "type": "string"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Binary"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "title": {
       "type": "string"
