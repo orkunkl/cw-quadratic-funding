@@ -48,7 +48,7 @@ pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Vote {
-    pub proposal_key: u8,
+    pub proposal_id: u64,
     pub voter: HumanAddr,
     pub fund: Coin,
 }

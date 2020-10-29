@@ -39,7 +39,6 @@ impl Default for InitMsg {
             vote_proposal_whitelist: None,
             voting_period: Default::default(),
             proposal_period: Default::default(),
-            coin_denom: "ucosm".to_string(),
         }
     }
 }
@@ -54,7 +53,7 @@ pub enum HandleMsg {
         fund_address: HumanAddr,
     },
     VoteProposal {
-        proposal_id: u8,
+        proposal_id: u64,
     },
     TriggerDistribution {},
 }
@@ -100,8 +99,7 @@ mod tests {
             Err(err) => println!("{:?}", err),
         }
 
-        let mut msg3 = msg.clone();
-        msg3.coin_denom = String::from("false");
+        let msg3 = msg.clone();
         match msg3.validate(env, &info) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::MultipleCoinsSent {}) => {}

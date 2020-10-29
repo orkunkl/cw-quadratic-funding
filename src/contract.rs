@@ -49,7 +49,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             fund_address,
         } => try_create_proposal(deps, env, info, title, description, metadata, fund_address),
         HandleMsg::VoteProposal { proposal_id } => try_vote_proposal(deps, env, info, proposal_id),
-        HandleMsg::TriggerDistribution { .. } => Ok(HandleResponse::default()),
+        HandleMsg::TriggerDistribution { .. } => try_trigger_distribution(deps, env, info),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
-    proposal_id: u8,
+    proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // check whitelist
@@ -127,7 +127,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     PROPOSALS.load(&deps.storage, &proposal_id.to_be_bytes())?;
 
     let data = Vote {
-        proposal_key: proposal_id,
+        proposal_id,
         voter: info.sender.clone(),
         fund,
     };
@@ -155,7 +155,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse<BankMsg>, ContractError> {
+) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // only admin can trigger distribution
     if info.sender != config.admin {
@@ -189,7 +189,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     let algo = QFAlgorithm { algo: CLR {} };
     let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
 
-    let mut distr_funds_msg: Vec<CosmosMsg<BankMsg>> = distr_funds
+    let mut distr_funds_msg: Vec<CosmosMsg> = distr_funds
         .iter()
         .map(|f| {
             CosmosMsg::Bank(BankMsg::Send {
@@ -200,7 +200,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         })
         .collect();
 
-    let leftover_msg: CosmosMsg<BankMsg> = CosmosMsg::Bank(BankMsg::Send {
+    let leftover_msg: CosmosMsg = CosmosMsg::Bank(BankMsg::Send {
         from_address: env.contract.address,
         // TODO: send to funder addr
         to_address: config.admin,
@@ -212,7 +212,6 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         attributes: vec![attr("action", "trigger_distribution")],
         data: None,
     };
-
     Ok(res)
 }
 
@@ -235,7 +234,7 @@ mod tests {
     use crate::error::ContractError;
     use crate::msg::{HandleMsg, InitMsg};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Binary, HumanAddr};
+    use cosmwasm_std::{coin, BankMsg, Binary, CosmosMsg, HumanAddr};
     use cw0::Expiration;
 
     #[test]
@@ -360,5 +359,157 @@ mod tests {
             Err(ContractError::VotingPeriodExpired {}) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
+    }
+
+    #[test]
+    fn trigger_distribution() {
+        let env = mock_env();
+        let info = mock_info("admin", &[coin(550000u128, "ucosm")]);
+        let mut deps = mock_dependencies(&[]);
+
+        let init_msg = InitMsg {
+            admin: HumanAddr::from("admin"),
+            create_proposal_whitelist: None,
+            vote_proposal_whitelist: None,
+            voting_period: Expiration::AtHeight(env.block.height + 15),
+            proposal_period: Expiration::AtHeight(env.block.height + 10),
+        };
+
+        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+
+        // insert proposals
+        let msg = HandleMsg::CreateProposal {
+            title: String::from("proposal 1"),
+            description: "".to_string(),
+            metadata: "".to_string(),
+            fund_address: HumanAddr::from("fund_address1"),
+        };
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(1_u64.to_be_bytes())),
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        let msg = HandleMsg::CreateProposal {
+            title: String::from("proposal 2"),
+            description: "".to_string(),
+            metadata: "".to_string(),
+            fund_address: HumanAddr::from("fund_address2"),
+        };
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(2_u64.to_be_bytes())),
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        let msg = HandleMsg::CreateProposal {
+            title: String::from("proposal 3"),
+            description: "".to_string(),
+            metadata: "".to_string(),
+            fund_address: HumanAddr::from("fund_address3"),
+        };
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(3_u64.to_be_bytes())),
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let msg = HandleMsg::CreateProposal {
+            title: String::from("proposal 4"),
+            description: "".to_string(),
+            metadata: "".to_string(),
+            fund_address: HumanAddr::from("fund_address4"),
+        };
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(4_u64.to_be_bytes())),
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+
+        // insert votes
+        // proposal1
+        let msg = HandleMsg::VoteProposal { proposal_id: 1 };
+        let info = mock_info("address1", &[coin(1200u128, "ucosm")]);
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let info = mock_info("address2", &[coin(44999u128, "ucosm")]);
+        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        let info = mock_info("address3", &[coin(33u128, "ucosm")]);
+        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+
+        // proposal2
+        let msg = HandleMsg::VoteProposal { proposal_id: 2 };
+        let info = mock_info("address4", &[coin(30000u128, "ucosm")]);
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let info = mock_info("address5", &[coin(58999u128, "ucosm")]);
+        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+
+        // proposal3
+        let msg = HandleMsg::VoteProposal { proposal_id: 3 };
+        let info = mock_info("address6", &[coin(230000u128, "ucosm")]);
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let info = mock_info("address7", &[coin(100u128, "ucosm")]);
+        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+
+        // proposal4
+        let msg = HandleMsg::VoteProposal { proposal_id: 4 };
+        let info = mock_info("address8", &[coin(100000u128, "ucosm")]);
+        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let info = mock_info("address9", &[coin(5u128, "ucosm")]);
+        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+
+        let trigger_msg = HandleMsg::TriggerDistribution {};
+        let info = mock_info("admin", &[]);
+        let mut env = mock_env();
+        env.block.height += 1000;
+        let res = handle(&mut deps, env.clone(), info, trigger_msg);
+
+        let expected_msgs = vec![
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: HumanAddr::from("fund_address1"),
+                amount: vec![coin(60212u128, "ucosm")],
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: HumanAddr::from("fund_address2"),
+                amount: vec![coin(164602u128, "ucosm")],
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: HumanAddr::from("fund_address3"),
+                amount: vec![coin(228537u128, "ucosm")],
+            }),
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: HumanAddr::from("fund_address4"),
+                amount: vec![coin(96648u128, "ucosm")],
+            }),
+            // left over msg
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: env.contract.address.clone(),
+                to_address: HumanAddr::from("admin"),
+                amount: vec![coin(1u128, "ucosm")],
+            }),
+        ];
+        match res {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        assert_eq!(expected_msgs, res.unwrap().messages);
     }
 }

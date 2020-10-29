@@ -47,7 +47,7 @@
           "properties": {
             "proposal_id": {
               "type": "integer",
-              "format": "uint8",
+              "format": "uint64",
               "minimum": 0.0
             }
           }

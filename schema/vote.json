@@ -4,16 +4,16 @@
   "type": "object",
   "required": [
     "fund",
-    "proposal_key",
+    "proposal_id",
     "voter"
   ],
   "properties": {
     "fund": {
       "$ref": "#/definitions/Coin"
     },
-    "proposal_key": {
+    "proposal_id": {
       "type": "integer",
-      "format": "uint8",
+      "format": "uint64",
       "minimum": 0.0
     },
     "voter": {
