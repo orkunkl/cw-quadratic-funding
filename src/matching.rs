@@ -3,25 +3,39 @@ use crate::state::Proposal;
 use cosmwasm_std::{coin, Coin, HumanAddr};
 use num_integer::Roots;
 
-trait QFAlgorithm {
+pub struct QFAlgorithm<S> {
+    pub(crate) algo: S,
+}
+
+impl<S> QFAlgorithm<S>
+where
+    S: Algo,
+{
+    pub fn distribute(
+        &self,
+        grants: Vec<(Proposal, Vec<u128>)>,
+        budget: Option<Coin>,
+    ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
+        self.algo.distribute(grants, budget)
+    }
+}
+trait Algo {
     // takes grantes denom and budget, returns "fund_address" -> "grant" vector and left over tokens to return
     fn distribute(
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
-        denom: String,
-        budget: Option<u128>,
+        budget: Option<Coin>,
     ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError>;
 }
 
-struct CLR;
+pub struct CLR;
 
-impl QFAlgorithm for CLR {
+impl Algo for CLR {
     // takes (proposal, votes) tuple vector returns (fund address, coin) to be executed
     fn distribute(
         &self,
         grants: Vec<(Proposal, Vec<u128>)>,
-        denom: String,
-        budget: Option<u128>,
+        budget: Option<Coin>,
     ) -> Result<(Vec<(HumanAddr, Coin)>, Coin), ContractError> {
         // clr algorithm works with budget constrain
         if budget.is_none() {
@@ -32,13 +46,16 @@ impl QFAlgorithm for CLR {
         let matched = CLR::calculate_matched_sum(grants.clone());
 
         // constraint the grants by budget
-        let constrained = CLR::constrain_by_budget(matched, budget.unwrap());
+        let constrained = CLR::constrain_by_budget(matched, budget.unwrap().clone().u128());
 
         // calculate leftover
         let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
-        let leftover = coin(budget.unwrap() - constrained_sum, denom.as_str());
+        let leftover = coin(
+            budget.unwrap().amount.u128() - constrained_sum,
+            budget.unwrap().denom.as_str(),
+        );
         // sanitize result
-        let res = CLR::sanitize_result(denom, constrained);
+        let res = CLR::sanitize_result(budget.unwrap().denom, constrained);
         Ok((res, leftover))
     }
 }
@@ -46,22 +63,26 @@ impl QFAlgorithm for CLR {
 impl CLR {
     // takes square root of each fund, sums, then squares and returns u128
     fn calculate_matched_sum(grants: Vec<(Proposal, Vec<u128>)>) -> Vec<(Proposal, u128)> {
-        grants.iter()
+        grants
+            .iter()
             .map(|g| {
                 let (proposal, votes) = g;
-                let sum_sqrts:u128 = votes.iter().map(|v| v.sqrt()).sum();
+                let sum_sqrts: u128 = votes.iter().map(|v| v.sqrt()).sum();
                 (proposal.clone(), sum_sqrts * sum_sqrts)
-            }).collect()
+            })
+            .collect()
     }
 
     // takes square root of each fund, sums, then squares and returns u128
-    fn constrain_by_budget(grants: Vec<(Proposal, u128)>, budget: u128) -> Vec<(Proposal, u128)>{
-        let raw_total:u128 = grants.iter().map(|g| g.1).sum();
-        grants.iter()
+    fn constrain_by_budget(grants: Vec<(Proposal, u128)>, budget: u128) -> Vec<(Proposal, u128)> {
+        let raw_total: u128 = grants.iter().map(|g| g.1).sum();
+        grants
+            .iter()
             .map(|g| {
                 let (proposal, grant) = g;
                 (proposal.clone(), (grant * budget) / raw_total)
-            }).collect()
+            })
+            .collect()
     }
 
     // sanitize result for handler to process.
@@ -89,7 +110,6 @@ mod tests {
 
     #[test]
     fn test_clr_1() {
-        let algo = CLR {};
         let proposal1 = Proposal {
             fund_address: HumanAddr::from("proposal1"),
             ..Default::default()
@@ -123,12 +143,13 @@ mod tests {
             (proposal3.fund_address, coin(52312u128, "ucosm")),
             (proposal4.fund_address, coin(714983u128, "ucosm")),
         ];
-        let res = algo.distribute(grants, String::from("ucosm"), Some(1000000u128));
+        let algo = QFAlgorithm { algo: CLR };
+        let res = algo.distribute(grants, Some(coin(1000000u128, "ucosm")));
         match res {
             Ok(o) => {
-            assert_eq!(o.0, expected);
-            assert_eq!(o.1, coin(1, "ucosm"))
-            },
+                assert_eq!(o.0, expected);
+                assert_eq!(o.1, coin(1, "ucosm"))
+            }
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
     }
@@ -141,7 +162,6 @@ mod tests {
     // grant4 96503.53   96648
     #[test]
     fn test_clr_2() {
-        let algo = CLR {};
         let proposal1 = Proposal {
             fund_address: HumanAddr::from("proposal1"),
             ..Default::default()
@@ -175,7 +195,8 @@ mod tests {
             (proposal3.fund_address, coin(228537u128, "ucosm")),
             (proposal4.fund_address, coin(96648u128, "ucosm")),
         ];
-        let res = algo.distribute(grants, String::from("ucosm"), Some(550000u128));
+        let algo = QFAlgorithm { algo: CLR };
+        let res = algo.distribute(grants, Some(coin(550000u128, "ucosm")));
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);

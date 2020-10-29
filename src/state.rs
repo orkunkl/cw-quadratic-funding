@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, StdResult, Storage};
-use cosmwasm_storage::{nextval, singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map};
 
@@ -31,12 +31,14 @@ pub struct Config {
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
     pub coin_denom: String,
+    pub budget: Coin,
 }
 
 pub const CONFIG: Item<Config> = Item::new(b"config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Proposal {
+    pub id: u8,
     pub title: String,
     pub description: String,
     pub metadata: String,
@@ -46,6 +48,7 @@ pub struct Proposal {
 impl Default for Proposal {
     fn default() -> Self {
         Proposal {
+            id: 0,
             title: "title".to_string(),
             description: "desc".to_string(),
             metadata: "dec".to_string(),
@@ -60,17 +63,11 @@ pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
     singleton(storage, PROPOSAL_SEQ)
 }
 
-pub fn create_proposal<S: Storage>(storage: &mut S, p: &Proposal) -> StdResult<u64> {
-    let next_id = nextval(&mut proposal_seq(storage))?;
-    PROPOSALS.save(storage, &next_id.to_be_bytes(), p)?;
-    Ok(next_id)
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Vote {
-    pub proposal_id: u64,
+    pub proposal_key: u8,
     pub voter: HumanAddr,
     pub fund: Coin,
 }
 
-pub const VOTES: Map<&[u8], Vote> = Map::new(b"votes");
+pub const VOTES: Map<(&[u8], &[u8]), Vote> = Map::new(b"votes");

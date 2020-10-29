@@ -17,7 +17,7 @@ pub struct InitMsg {
 }
 
 impl InitMsg {
-    pub fn validate(&self, env: Env, info: MessageInfo) -> Result<(), ContractError> {
+    pub fn validate(&self, env: Env, info: &MessageInfo) -> Result<(), ContractError> {
         // check if proposal period is expired
         if self.proposal_period.is_expired(&env.block) {
             return Err(ContractError::ProposalPeriodExpired {});
@@ -55,11 +55,9 @@ pub enum HandleMsg {
         fund_address: HumanAddr,
     },
     VoteProposal {
-        proposal_id: u64,
+        proposal_id: u8,
     },
-    TriggerDistribution {
-        proposal_id: u32,
-    },
+    TriggerDistribution {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -89,7 +87,7 @@ mod tests {
 
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);
-        match msg1.validate(env.clone(), info.clone()) {
+        match msg1.validate(env.clone(), &info){
             Ok(_) => panic!("expected error"),
             Err(ContractError::VotingPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),
@@ -97,7 +95,7 @@ mod tests {
 
         let mut msg2 = msg.clone();
         msg2.proposal_period = Expiration::AtHeight(15);
-        match msg2.validate(env.clone(), info.clone()) {
+        match msg2.validate(env.clone(), &info) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::ProposalPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),
@@ -105,7 +103,7 @@ mod tests {
 
         let mut msg3 = msg.clone();
         msg3.coin_denom = String::from("false");
-        match msg3.validate(env, info) {
+        match msg3.validate(env, &info) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::ExpectedCoinNotSent { coin_denom: _ }) => {}
             Err(err) => println!("{:?}", err),

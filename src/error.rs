@@ -21,6 +21,9 @@ pub enum ContractError {
     #[error("Expected coin not sent (expected: {coin_denom})")]
     ExpectedCoinNotSent { coin_denom: String },
 
+    #[error("Address already voted project")]
+    AddressAlreadyVotedProject {},
+
     #[error("CLR algorithm requires a budget constrain")]
     CLRConstrainRequired {},
 }

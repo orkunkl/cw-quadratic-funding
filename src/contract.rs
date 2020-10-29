@@ -1,12 +1,16 @@
 use cosmwasm_std::{
-    attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
-    StdResult, Storage,
+    attr, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order,
+    Querier, StdResult, Storage,
 };
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
+use crate::matching::{QFAlgorithm, CLR};
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{create_proposal, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
+use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
+use cosmwasm_storage::nextval;
+use cw_storage_plus::Bound;
+use std::sync::atomic::Ordering;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -16,8 +20,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
-    msg.validate(env, info)?;
+    msg.validate(env, &info)?;
 
+    let budget = extract_funding_coin(info.sent_funds.as_slice(), msg.coin_denom.clone())?;
     let cfg = Config {
         admin: msg.admin,
         create_proposal_whitelist: msg.create_proposal_whitelist,
@@ -25,6 +30,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         voting_period: msg.voting_period,
         proposal_period: msg.proposal_period,
         coin_denom: msg.coin_denom,
+        budget,
     };
     CONFIG.save(&mut deps.storage, &cfg)?;
 
@@ -73,21 +79,20 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
         return Err(ContractError::ProposalPeriodExpired {});
     }
 
-    let proposal = Proposal {
+    let id = nextval(&mut proposal_seq(&mut deps.storage))?;
+    let p = Proposal {
+        id: id as u8,
         title,
         description,
         metadata,
         fund_address,
     };
-    let proposal_id = create_proposal(&mut deps.storage, &proposal)?;
+    PROPOSALS.save(&mut deps.storage, &id.to_be_bytes(), &p)?;
 
     let res = HandleResponse {
         messages: vec![],
-        attributes: vec![
-            attr("action", "create_proposal"),
-            attr("proposal_id", proposal_id),
-        ],
-        data: Some(Binary::from(proposal_id.to_be_bytes())),
+        attributes: vec![attr("action", "create_proposal"), attr("proposal_id", id)],
+        data: Some(Binary::from(id.to_be_bytes())),
     };
 
     Ok(res)
@@ -97,7 +102,7 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     info: MessageInfo,
-    proposal_id: u64,
+    proposal_id: u8,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // check whitelist
@@ -118,18 +123,24 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     // check proposal exists
     PROPOSALS.load(&deps.storage, &proposal_id.to_be_bytes())?;
 
-    let vote = Vote {
-        proposal_id,
-        voter: info.sender,
+    let data = Vote {
+        proposal_key: proposal_id,
+        voter: info.sender.clone(),
         fund: coin,
     };
 
-    VOTES.save(&mut deps.storage, &proposal_id.to_be_bytes(), &vote)?;
+    // check sender did not voted on proposal
+    let vote = VOTES.key((&proposal_id.to_be_bytes(), info.sender.as_bytes()));
+    if vote.may_load(&deps.storage)?.is_some() {
+        return Err(ContractError::AddressAlreadyVotedProject {});
+    }
+    // save vote
+    vote.save(&mut deps.storage, &data)?;
 
     let res = HandleResponse {
         attributes: vec![
             attr("action", "vote_proposal"),
-            attr("proposal_id", proposal_id),
+            attr("proposal_key", proposal_id),
         ],
         ..Default::default()
     };
@@ -152,10 +163,27 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         return Err(ContractError::VotingPeriodNotExpired {});
     }
 
-    // quadratic funding logic goes here
+    let query_proposals: StdResult<Vec<_>> = PROPOSALS
+        .range(&deps.storage, None, None, Order::Ascending)
+        .collect();
 
-    //---------------
+    let proposals: Vec<Proposal> = query_proposals?.iter().map(|p| p.1.clone()).collect();
 
+    let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
+    for p in proposals {
+        let vote_query: StdResult<Vec<(Vec<u8>,Vote)>> = VOTES
+            .prefix(&[p.id])
+            .range(&deps.storage, None, None, Order::Ascending)
+            .collect();
+        let mut votes: Vec<u128> = vec![];
+        for v in vote_query? {
+            votes.push(v.1.fund.amount.u128());
+        }
+        grants.push((p, votes));
+    }
+
+    let algo = QFAlgorithm { algo: CLR {} };
+    algo.distribute(grants, Some(config.budget));
     let res = HandleResponse {
         attributes: vec![attr("action", "trigger_distribution")],
         ..Default::default()
