@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
-use cosmwasm_std::{Env, HumanAddr, MessageInfo};
+use cosmwasm_std::{Env, HumanAddr, MessageInfo, Binary};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ pub enum HandleMsg {
     CreateProposal {
         title: String,
         description: String,
-        metadata: String,
+        metadata: Option<Binary>,
         fund_address: HumanAddr,
     },
     VoteProposal {

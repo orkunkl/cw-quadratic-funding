@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage};
+use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage, Binary};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map};
@@ -24,7 +24,7 @@ pub struct Proposal {
     pub id: u64,
     pub title: String,
     pub description: String,
-    pub metadata: String,
+    pub metadata: Option<Binary>,
     pub fund_address: CanonicalAddr,
 }
 
@@ -34,7 +34,7 @@ impl Default for Proposal {
             id: 0,
             title: "title".to_string(),
             description: "desc".to_string(),
-            metadata: "dec".to_string(),
+            metadata: Some(Binary::from(b"metadata")),
             fund_address: Default::default(),
         }
     }

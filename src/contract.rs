@@ -59,7 +59,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
     info: MessageInfo,
     title: String,
     description: String,
-    metadata: String,
+    metadata: Option<Binary>,
     fund_address: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
@@ -253,7 +253,7 @@ mod tests {
         let msg = HandleMsg::CreateProposal {
             title: String::from("test"),
             description: String::from("test"),
-            metadata: String::from("test"),
+            metadata: Some(b"test".into()),
             fund_address: HumanAddr::from("fund_address"),
         };
 
@@ -311,7 +311,7 @@ mod tests {
         let create_proposal_msg = HandleMsg::CreateProposal {
             title: String::from("test"),
             description: String::from("test"),
-            metadata: String::from("test"),
+            metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address"),
         };
 
@@ -379,7 +379,7 @@ mod tests {
         let msg = HandleMsg::CreateProposal {
             title: String::from("proposal 1"),
             description: "".to_string(),
-            metadata: "".to_string(),
+            metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address1"),
         };
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
@@ -391,7 +391,7 @@ mod tests {
         let msg = HandleMsg::CreateProposal {
             title: String::from("proposal 2"),
             description: "".to_string(),
-            metadata: "".to_string(),
+            metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address2"),
         };
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
@@ -403,7 +403,7 @@ mod tests {
         let msg = HandleMsg::CreateProposal {
             title: String::from("proposal 3"),
             description: "".to_string(),
-            metadata: "".to_string(),
+            metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address3"),
         };
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
@@ -414,7 +414,7 @@ mod tests {
         let msg = HandleMsg::CreateProposal {
             title: String::from("proposal 4"),
             description: "".to_string(),
-            metadata: "".to_string(),
+            metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address4"),
         };
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
