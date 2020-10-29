@@ -77,7 +77,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
 
     let id = nextval(&mut proposal_seq(&mut deps.storage))?;
     let p = Proposal {
-        id: id as u8,
+        id,
         title,
         description,
         metadata,
@@ -114,9 +114,12 @@ pub fn try_vote_proposal<S: Storage, A: Api, Q: Querier>(
     }
 
     // validate sent funds and funding denom matches
-    let fund= extract_funding_coin(&info.sent_funds)?;
+    let fund = extract_funding_coin(&info.sent_funds)?;
     if fund.denom != config.budget.denom {
-        return Err(ContractError::WrongFundCoin { expected: config.budget.denom, got: fund.denom });
+        return Err(ContractError::WrongFundCoin {
+            expected: config.budget.denom,
+            got: fund.denom,
+        });
     }
 
     // check proposal exists
@@ -171,7 +174,7 @@ pub fn try_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
-            .prefix(&[p.id])
+            .prefix(&p.id.to_be_bytes())
             .range(&deps.storage, None, None, Order::Ascending)
             .collect();
         let mut votes: Vec<u128> = vec![];

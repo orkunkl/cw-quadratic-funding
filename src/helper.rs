@@ -3,7 +3,7 @@ use cosmwasm_std::Coin;
 
 pub fn extract_funding_coin(sent_funds: &[Coin]) -> Result<Coin, ContractError> {
     if sent_funds.len() != 1 {
-        return Err(ContractError::MultipleCoinsSent{});
+        return Err(ContractError::MultipleCoinsSent {});
     }
     Ok(sent_funds[0].clone())
 }
@@ -30,7 +30,7 @@ mod tests {
 
         match extract_funding_coin(&info.clone().sent_funds) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::MultipleCoinsSent{ .. }) => {}
+            Err(ContractError::MultipleCoinsSent { .. }) => {}
             Err(err) => println!("{:?}", err),
         }
     }

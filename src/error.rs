@@ -19,10 +19,10 @@ pub enum ContractError {
     VotingPeriodNotExpired {},
 
     #[error("Multiple coin type sent")]
-    MultipleCoinsSent{ },
+    MultipleCoinsSent {},
 
     #[error("Wrong fund coin (expected: {expected}, got: {got})")]
-    WrongFundCoin{ expected: String, got: String },
+    WrongFundCoin { expected: String, got: String },
 
     #[error("Address already voted project")]
     AddressAlreadyVotedProject {},

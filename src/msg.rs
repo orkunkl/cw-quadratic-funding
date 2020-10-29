@@ -105,7 +105,7 @@ mod tests {
         msg3.coin_denom = String::from("false");
         match msg3.validate(env, &info) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::MultipleCoinsSent{ }) => {}
+            Err(ContractError::MultipleCoinsSent {}) => {}
             Err(err) => println!("{:?}", err),
         }
     }

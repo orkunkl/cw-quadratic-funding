@@ -1,26 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Coin, HumanAddr, Storage};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_std::{Coin, HumanAddr, Storage};
+use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map};
-
-pub static STATE_KEY: &[u8] = b"state";
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: CanonicalAddr,
-}
-
-pub fn state<S: Storage>(storage: &mut S) -> Singleton<S, State> {
-    singleton(storage, STATE_KEY)
-}
-
-pub fn state_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
-    singleton_read(storage, STATE_KEY)
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
@@ -37,7 +21,7 @@ pub const CONFIG: Item<Config> = Item::new(b"config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Proposal {
-    pub id: u8,
+    pub id: u64,
     pub title: String,
     pub description: String,
     pub metadata: String,
