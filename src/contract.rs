@@ -67,8 +67,7 @@ pub fn try_create_proposal<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     let config = CONFIG.load(&deps.storage)?;
     // check whitelist
-    if config.create_proposal_whitelist.is_some() {
-        let wl = config.create_proposal_whitelist.unwrap();
+    if let Some(wl) = config.create_proposal_whitelist {
         if !wl.contains(&info.sender) {
             return Err(ContractError::Unauthorized {});
         }
