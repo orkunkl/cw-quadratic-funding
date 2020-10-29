@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, Order, Querier, StdResult, Storage,
-};
+use cosmwasm_std::{attr, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, to_binary};
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
@@ -225,26 +222,32 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
+    deps: &Extern<S, A, Q>,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::ProposalByID { .. } => {}
-        QueryMsg::ProposalByFundAddress { .. } => {}
-        QueryMsg::AllProposals { .. } => {}
+        QueryMsg::ProposalByID { id } => to_binary(&query_proposal_id(deps, id)?),
+        _ => unimplemented!()
     }
-    Ok(Binary::from(b"1"))
+}
+
+fn query_proposal_id<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    id: u64,
+) -> StdResult<Proposal> {
+    PROPOSALS.load(&deps.storage, &id.to_be_bytes())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init};
+    use crate::contract::{handle, init, query_proposal_id};
     use crate::error::ContractError;
     use crate::msg::{HandleMsg, InitMsg};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, BankMsg, Binary, CosmosMsg, HumanAddr};
     use cw0::Expiration;
+    use crate::state::{PROPOSALS, Proposal};
 
     #[test]
     fn create_proposal() {
@@ -528,5 +531,26 @@ mod tests {
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
         assert_eq!(expected_msgs, res.unwrap().messages);
+    }
+
+    #[test]
+    fn query_proposal() {
+        let mut deps= mock_dependencies(&[]);
+
+        let proposal = Proposal {
+            id: 1,
+            title: "title".to_string(),
+            description: "desc".to_string(),
+            metadata: None,
+            fund_address: Default::default(),
+        };
+
+        let err = PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
+        match err {
+            Ok(_) => {}
+            e => panic!("unexpected error, got {}", e.unwrap_err()),
+        }
+        let res = query_proposal_id(&deps, 1).unwrap();
+        assert_eq!(proposal, res);
     }
 }
