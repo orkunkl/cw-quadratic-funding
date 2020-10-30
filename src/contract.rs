@@ -123,12 +123,6 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
 
     // validate sent funds and funding denom matches
     let fund = extract_budget_coin(&info.sent_funds, config.budget.denom.clone())?;
-    if fund.denom != config.budget.denom {
-        return Err(ContractError::WrongFundCoin {
-            expected: config.budget.denom,
-            got: fund.denom,
-        });
-    }
 
     // check proposal exists
     PROPOSALS.load(&deps.storage, proposal_id.into())?;
