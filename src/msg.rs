@@ -6,7 +6,7 @@ use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct InitMsg {
     pub admin: HumanAddr,
@@ -29,18 +29,6 @@ impl InitMsg {
 
         extract_funding_coin(&info.sent_funds)?;
         Ok(())
-    }
-}
-
-impl Default for InitMsg {
-    fn default() -> Self {
-        InitMsg {
-            admin: Default::default(),
-            create_proposal_whitelist: None,
-            vote_proposal_whitelist: None,
-            voting_period: Default::default(),
-            proposal_period: Default::default(),
-        }
     }
 }
 

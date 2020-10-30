@@ -279,7 +279,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
-            admin: Default::default(),
+            admin: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
@@ -316,6 +316,7 @@ mod tests {
         let info = mock_info("true", &[coin(1000, "ucosm")]);
         let mut deps = mock_dependencies(&[]);
         let init_msg = InitMsg {
+            admin: HumanAddr::from("person"),
             create_proposal_whitelist: Some(vec![HumanAddr::from("false")]),
             ..Default::default()
         };
@@ -337,7 +338,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
-            admin: Default::default(),
+            admin: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
