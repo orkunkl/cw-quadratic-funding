@@ -89,8 +89,8 @@ impl CLR {
 #[cfg(test)]
 mod tests {
     use crate::matching::{QFAlgorithm, CLR};
-    use cosmwasm_std::CanonicalAddr;
     use crate::state::Proposal;
+    use cosmwasm_std::CanonicalAddr;
 
     #[test]
     fn test_clr_1() {

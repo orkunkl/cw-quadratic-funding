@@ -180,7 +180,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         .range(&deps.storage, None, None, Order::Ascending)
         .collect();
 
-    let proposals: Vec<Proposal> = query_proposals?.iter().map(|p| p.1.clone()).collect();
+    let proposals: Vec<Proposal> = query_proposals?.into_iter().map(|p| p.1).collect();
 
     let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
     for p in proposals {
@@ -199,9 +199,10 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     // TODO make customizable
     let algo = QFAlgorithm { algo: CLR {} };
     let pre_process = grants
-        .iter()
-        .map(|g| (g.0.fund_address.clone(), g.1.clone()))
+        .into_iter()
+        .map(|g| (g.0.fund_address, g.1))
         .collect();
+
     let (distr_funds, leftover) =
         algo.distribute(pre_process, Some(config.budget.amount.u128()))?;
 
@@ -256,7 +257,7 @@ fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
         .range(&deps.storage, None, None, Order::Ascending)
         .collect();
     all.map(|p| {
-        let res = p.iter().map(|x| x.1.clone()).collect();
+        let res = p.into_iter().map(|x| x.1).collect();
 
         AllProposalsResponse { proposals: res }
     })
