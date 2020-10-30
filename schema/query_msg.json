@@ -26,25 +26,6 @@
     {
       "type": "object",
       "required": [
-        "proposal_by_fund_address"
-      ],
-      "properties": {
-        "proposal_by_fund_address": {
-          "type": "object",
-          "required": [
-            "fund_address"
-          ],
-          "properties": {
-            "fund_address": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
         "all_proposals"
       ],
       "properties": {
@@ -53,10 +34,5 @@
         }
       }
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }

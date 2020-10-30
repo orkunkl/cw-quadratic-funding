@@ -1,9 +1,12 @@
-use cosmwasm_std::{attr, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, AllBalanceResponse};
+use cosmwasm_std::{
+    attr, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
+};
 
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
 use crate::matching::{QFAlgorithm, CLR};
-use crate::msg::{HandleMsg, InitMsg, QueryMsg, AllProposalsResponse};
+use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
 
@@ -230,7 +233,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::ProposalByID { id } => to_binary(&query_proposal_id(deps, id)?),
-        QueryMsg::AllProposals { } => to_binary(&query_all_proposals(deps)?)
+        QueryMsg::AllProposals {} => to_binary(&query_all_proposals(deps)?),
     }
 }
 
@@ -248,25 +251,21 @@ fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
         .range(&deps.storage, None, None, Order::Ascending)
         .collect();
     all.map(|p| {
-        Iterator
-        let res = p.concat();
-        AllProposalsResponse{
-            proposals: res
-        }
-    })
+        let res = p.iter().map(|x| x.1.clone()).collect();
 
+        AllProposalsResponse { proposals: res }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, query_proposal_id, query_all_proposals};
+    use crate::contract::{handle, init, query_all_proposals, query_proposal_id};
     use crate::error::ContractError;
-    use crate::msg::{HandleMsg, InitMsg, AllProposalsResponse};
+    use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg};
     use crate::state::{Proposal, PROPOSALS};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, BankMsg, Binary, CosmosMsg, HumanAddr};
     use cw0::Expiration;
-    use crate::msg::QueryMsg::AllProposals;
 
     #[test]
     fn create_proposal() {
@@ -584,7 +583,7 @@ mod tests {
             metadata: None,
             fund_address: Default::default(),
         };
-        PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
+        let _ = PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
 
         let proposal1 = Proposal {
             id: 2,
@@ -593,12 +592,14 @@ mod tests {
             metadata: None,
             fund_address: Default::default(),
         };
-        PROPOSALS.save(&mut deps.storage, &2_u64.to_be_bytes(), &proposal1);
-
-
-
+        let _ = PROPOSALS.save(&mut deps.storage, &2_u64.to_be_bytes(), &proposal1);
         let res = query_all_proposals(&deps).unwrap();
 
-        assert_eq!(AllProposalsResponse{ proposals: vec![proposal, proposal1] }, res);
+        assert_eq!(
+            AllProposalsResponse {
+                proposals: vec![proposal, proposal1]
+            },
+            res
+        );
     }
 }

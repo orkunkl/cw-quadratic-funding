@@ -1,10 +1,10 @@
 use crate::error::ContractError;
 use crate::helper::extract_funding_coin;
+use crate::state::Proposal;
 use cosmwasm_std::{Binary, Env, HumanAddr, MessageInfo};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use crate::state::Proposal;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
