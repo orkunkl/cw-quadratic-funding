@@ -127,25 +127,26 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     // check proposal exists
     PROPOSALS.load(&deps.storage, proposal_id.into())?;
 
-    let data = Vote {
+    let vote = Vote {
         proposal_id,
         voter: deps.api.canonical_address(&info.sender)?,
         fund,
     };
 
     // check sender did not voted on proposal
-    let vote = VOTES.key((proposal_id.into(), info.sender.as_bytes()));
-    if vote.may_load(&deps.storage)?.is_some() {
+    let vote_key = VOTES.key((proposal_id.into(), info.sender.as_bytes()));
+    if vote_key.may_load(&deps.storage)?.is_some() {
         return Err(ContractError::AddressAlreadyVotedProject {});
     }
 
     // save vote
-    vote.save(&mut deps.storage, &data)?;
+    vote_key.save(&mut deps.storage, &vote)?;
 
     let res = HandleResponse {
         attributes: vec![
             attr("action", "vote_proposal"),
             attr("proposal_key", proposal_id),
+            attr("voter", deps.api.human_address(&vote.voter)),
         ],
         ..Default::default()
     };
