@@ -2,7 +2,7 @@ use crate::error::ContractError;
 use cosmwasm_std::CanonicalAddr;
 use num_integer::Roots;
 
-pub struct QFAlgorithm<S> {
+pub struct QFAlgorithm<S: Algo> {
     pub(crate) algo: S,
 }
 
@@ -61,11 +61,11 @@ impl CLR {
         grants: Vec<(CanonicalAddr, Vec<u128>)>,
     ) -> Vec<(CanonicalAddr, u128)> {
         grants
-            .iter()
+            .into_iter()
             .map(|g| {
                 let (proposal, votes) = g;
                 let sum_sqrts: u128 = votes.iter().map(|v| v.sqrt()).sum();
-                (proposal.clone(), sum_sqrts * sum_sqrts)
+                (proposal, sum_sqrts * sum_sqrts)
             })
             .collect()
     }
@@ -77,10 +77,10 @@ impl CLR {
     ) -> Vec<(CanonicalAddr, u128)> {
         let raw_total: u128 = grants.iter().map(|g| g.1).sum();
         grants
-            .iter()
+            .into_iter()
             .map(|g| {
                 let (proposal, grant) = g;
-                (proposal.clone(), (grant * budget) / raw_total)
+                (proposal, (grant * budget) / raw_total)
             })
             .collect()
     }
@@ -90,6 +90,7 @@ impl CLR {
 mod tests {
     use crate::matching::{QFAlgorithm, CLR};
     use cosmwasm_std::CanonicalAddr;
+    use crate::state::Proposal;
 
     #[test]
     fn test_clr_1() {
