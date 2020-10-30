@@ -1,7 +1,6 @@
 use crate::error::ContractError;
-use crate::helper::extract_funding_coin;
 use crate::state::Proposal;
-use cosmwasm_std::{Binary, Env, HumanAddr, MessageInfo};
+use cosmwasm_std::{Binary, Env, HumanAddr};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -14,10 +13,11 @@ pub struct InitMsg {
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
+    pub budget_denom: String,
 }
 
 impl InitMsg {
-    pub fn validate(&self, env: Env, info: &MessageInfo) -> Result<(), ContractError> {
+    pub fn validate(&self, env: Env) -> Result<(), ContractError> {
         // check if proposal period is expired
         if self.proposal_period.is_expired(&env.block) {
             return Err(ContractError::ProposalPeriodExpired {});
@@ -27,7 +27,6 @@ impl InitMsg {
             return Err(ContractError::VotingPeriodExpired {});
         }
 
-        extract_funding_coin(&info.sent_funds)?;
         Ok(())
     }
 }
@@ -62,14 +61,11 @@ pub struct AllProposalsResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::coin;
-    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::testing::mock_env;
 
     #[test]
     fn validate_init_msg() {
         let mut env = mock_env();
-        let denom = String::from("denom");
-        let info = mock_info("creator", &[coin(4, denom.as_str())]);
 
         env.block.height = 30;
         let msg = InitMsg {
@@ -78,7 +74,7 @@ mod tests {
 
         let mut msg1 = msg.clone();
         msg1.voting_period = Expiration::AtHeight(15);
-        match msg1.validate(env.clone(), &info) {
+        match msg1.validate(env.clone()) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::VotingPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),
@@ -86,17 +82,15 @@ mod tests {
 
         let mut msg2 = msg.clone();
         msg2.proposal_period = Expiration::AtHeight(15);
-        match msg2.validate(env.clone(), &info) {
+        match msg2.validate(env.clone()) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::ProposalPeriodExpired {}) => {}
             Err(err) => println!("{:?}", err),
         }
 
         let msg3 = msg.clone();
-        let info = mock_info("creator", &[coin(4, denom.as_str()), coin(4, "test")]);
-        match msg3.validate(env, &info) {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::MultipleCoinsSent {}) => {}
+        match msg3.validate(env) {
+            Ok(_) => {}
             Err(err) => println!("{:?}", err),
         }
     }

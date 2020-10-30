@@ -4,12 +4,16 @@
   "type": "object",
   "required": [
     "admin",
+    "budget_denom",
     "proposal_period",
     "voting_period"
   ],
   "properties": {
     "admin": {
       "$ref": "#/definitions/HumanAddr"
+    },
+    "budget_denom": {
+      "type": "string"
     },
     "create_proposal_whitelist": {
       "type": [

@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::helper::extract_funding_coin;
+use crate::helper::extract_budget_coin;
 use crate::matching::{QFAlgorithm, CLR};
 use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
@@ -18,9 +18,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
-    msg.validate(env, &info)?;
+    msg.validate(env)?;
 
-    let budget = extract_funding_coin(info.sent_funds.as_slice())?;
+    let budget = extract_budget_coin(info.sent_funds.as_slice(), msg.budget_denom)?;
     let cfg = Config {
         admin: deps.api.canonical_address(&msg.admin)?,
         create_proposal_whitelist: msg.create_proposal_whitelist,
@@ -122,7 +122,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     }
 
     // validate sent funds and funding denom matches
-    let fund = extract_funding_coin(&info.sent_funds)?;
+    let fund = extract_budget_coin(&info.sent_funds, config.budget.denom.clone())?;
     if fund.denom != config.budget.denom {
         return Err(ContractError::WrongFundCoin {
             expected: config.budget.denom,
@@ -285,6 +285,7 @@ mod tests {
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
+            budget_denom: String::from("ucosm"),
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -319,6 +320,7 @@ mod tests {
         let init_msg = InitMsg {
             admin: HumanAddr::from("person"),
             create_proposal_whitelist: Some(vec![HumanAddr::from("false")]),
+            budget_denom: String::from("ucosm"),
             ..Default::default()
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -344,6 +346,7 @@ mod tests {
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
+            budget_denom: String::from("ucosm"),
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
@@ -418,6 +421,7 @@ mod tests {
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
+            budget_denom: String::from("ucosm"),
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();

@@ -1,9 +1,16 @@
 use crate::error::ContractError;
 use cosmwasm_std::Coin;
 
-pub fn extract_funding_coin(sent_funds: &[Coin]) -> Result<Coin, ContractError> {
+// extract budget coin validate against sent_funds.denom
+pub fn extract_budget_coin(sent_funds: &[Coin], denom: String) -> Result<Coin, ContractError> {
     if sent_funds.len() != 1 {
         return Err(ContractError::MultipleCoinsSent {});
+    }
+    if sent_funds[0].denom != denom {
+        return Err(ContractError::WrongFundCoin {
+            expected: denom,
+            got: sent_funds[0].denom.clone(),
+        });
     }
     Ok(sent_funds[0].clone())
 }
@@ -11,7 +18,7 @@ pub fn extract_funding_coin(sent_funds: &[Coin]) -> Result<Coin, ContractError> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helper::extract_funding_coin;
+    use crate::helper::extract_budget_coin;
     use cosmwasm_std::coin;
     use cosmwasm_std::testing::mock_info;
 
@@ -21,14 +28,14 @@ mod tests {
         let c = &[coin(4, denom)];
         let info = mock_info("creator", c);
 
-        let res = extract_funding_coin(&info.sent_funds);
+        let res = extract_budget_coin(&info.sent_funds, denom.to_string());
         match res {
             Ok(cc) => assert_eq!(c, &[cc]),
             Err(err) => println!("{:?}", err),
         }
         let info = mock_info("creator", &[coin(4, denom), coin(4, "test")]);
 
-        match extract_funding_coin(&info.clone().sent_funds) {
+        match extract_budget_coin(&info.clone().sent_funds, denom.to_string()) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::MultipleCoinsSent { .. }) => {}
             Err(err) => println!("{:?}", err),
