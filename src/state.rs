@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Binary, CanonicalAddr, Coin, HumanAddr, Storage};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
-use cw_storage_plus::{Item, Map};
+use cw_storage_plus::{Item, Map, U64Key};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
@@ -39,7 +39,7 @@ impl Default for Proposal {
         }
     }
 }
-pub const PROPOSALS: Map<&[u8], Proposal> = Map::new(b"proposal");
+pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposal");
 pub const PROPOSAL_SEQ: &[u8] = b"proposal_seq";
 
 pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
@@ -53,4 +53,4 @@ pub struct Vote {
     pub fund: Coin,
 }
 
-pub const VOTES: Map<(&[u8], &[u8]), Vote> = Map::new(b"votes");
+pub const VOTES: Map<(U64Key, &[u8]), Vote> = Map::new(b"votes");

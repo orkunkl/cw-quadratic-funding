@@ -86,7 +86,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
         metadata,
         fund_address: deps.api.canonical_address(&fund_address)?,
     };
-    PROPOSALS.save(&mut deps.storage, &id.to_be_bytes(), &p)?;
+    PROPOSALS.save(&mut deps.storage, id.into(), &p)?;
 
     let res = HandleResponse {
         messages: vec![],
@@ -131,7 +131,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     }
 
     // check proposal exists
-    PROPOSALS.load(&deps.storage, &proposal_id.to_be_bytes())?;
+    PROPOSALS.load(&deps.storage, proposal_id.into())?;
 
     let data = Vote {
         proposal_id,
@@ -140,7 +140,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     };
 
     // check sender did not voted on proposal
-    let vote = VOTES.key((&proposal_id.to_be_bytes(), info.sender.as_bytes()));
+    let vote = VOTES.key((proposal_id.into(), info.sender.as_bytes()));
     if vote.may_load(&deps.storage)?.is_some() {
         return Err(ContractError::AddressAlreadyVotedProject {});
     }
@@ -185,7 +185,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
-            .prefix(&p.id.to_be_bytes())
+            .prefix(p.id.into())
             .range(&deps.storage, None, None, Order::Ascending)
             .collect();
 
@@ -247,7 +247,7 @@ fn query_proposal_id<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     id: u64,
 ) -> StdResult<Proposal> {
-    PROPOSALS.load(&deps.storage, &id.to_be_bytes())
+    PROPOSALS.load(&deps.storage, id.into())
 }
 
 fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
@@ -570,7 +570,7 @@ mod tests {
             fund_address: Default::default(),
         };
 
-        let err = PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
+        let err = PROPOSALS.save(&mut deps.storage, 1_u64.into(), &proposal);
         match err {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -590,7 +590,7 @@ mod tests {
             metadata: None,
             fund_address: Default::default(),
         };
-        let _ = PROPOSALS.save(&mut deps.storage, &1_u64.to_be_bytes(), &proposal);
+        let _ = PROPOSALS.save(&mut deps.storage, 1_u64.into(), &proposal);
 
         let proposal1 = Proposal {
             id: 2,
@@ -599,7 +599,7 @@ mod tests {
             metadata: None,
             fund_address: Default::default(),
         };
-        let _ = PROPOSALS.save(&mut deps.storage, &2_u64.to_be_bytes(), &proposal1);
+        let _ = PROPOSALS.save(&mut deps.storage, 2_u64.into(), &proposal1);
         let res = query_all_proposals(&deps).unwrap();
 
         assert_eq!(
