@@ -47,6 +47,8 @@ impl Algo for CLR {
 
             // calculate leftover
             let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
+            // shouldn't be used with tokens with > 10 decimal points
+            // will cause overflow and panic on the during execution.
             let leftover = budget - constrained_sum;
             Ok((constrained, leftover))
         } else {
