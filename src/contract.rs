@@ -146,7 +146,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
         attributes: vec![
             attr("action", "vote_proposal"),
             attr("proposal_key", proposal_id),
-            attr("voter", deps.api.human_address(&vote.voter)),
+            attr("voter", deps.api.human_address(&vote.voter)?),
         ],
         ..Default::default()
     };
