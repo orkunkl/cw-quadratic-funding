@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    attr, coin, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
@@ -198,14 +198,19 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     // TODO make customizable
     let algo = QFAlgorithm { algo: CLR {} };
-    let (distr_funds, leftover) = algo.distribute(grants, Some(config.budget))?;
+    let pre_process = grants
+        .iter()
+        .map(|g| (g.0.fund_address.clone(), g.1.clone()))
+        .collect();
+    let (distr_funds, leftover) =
+        algo.distribute(pre_process, Some(config.budget.amount.u128()))?;
 
     let mut msgs = vec![];
     for f in distr_funds {
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
             from_address: env.contract.address.clone(),
             to_address: deps.api.human_address(&f.0)?,
-            amount: vec![f.clone().1],
+            amount: vec![coin(f.clone().1, &config.budget.denom)],
         }));
     }
 
@@ -213,7 +218,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         from_address: env.contract.address,
         // TODO: send to funder addr
         to_address: deps.api.human_address(&config.admin)?,
-        amount: vec![leftover],
+        amount: vec![coin(leftover, config.budget.denom)],
     });
 
     msgs.push(leftover_msg);

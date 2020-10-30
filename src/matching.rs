@@ -1,6 +1,5 @@
 use crate::error::ContractError;
-use crate::state::Proposal;
-use cosmwasm_std::{coin, CanonicalAddr, Coin};
+use cosmwasm_std::CanonicalAddr;
 use num_integer::Roots;
 
 pub struct QFAlgorithm<S> {
@@ -13,9 +12,9 @@ where
 {
     pub fn distribute(
         &self,
-        grants: Vec<(Proposal, Vec<u128>)>,
-        budget: Option<Coin>,
-    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError> {
+        grants: Vec<(CanonicalAddr, Vec<u128>)>,
+        budget: Option<u128>,
+    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
         self.algo.distribute(grants, budget)
     }
 }
@@ -24,9 +23,9 @@ pub trait Algo {
     // takes grantes denom and budget, returns "fund_address" -> "grant" vector and left over tokens to return
     fn distribute(
         &self,
-        grants: Vec<(Proposal, Vec<u128>)>,
-        budget: Option<Coin>,
-    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError>;
+        grants: Vec<(CanonicalAddr, Vec<u128>)>,
+        budget: Option<u128>,
+    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError>;
 }
 
 pub struct CLR;
@@ -35,26 +34,21 @@ impl Algo for CLR {
     // takes (proposal, votes) tuple vector returns (fund address, coin) to be executed
     fn distribute(
         &self,
-        grants: Vec<(Proposal, Vec<u128>)>,
-        budget: Option<Coin>,
-    ) -> Result<(Vec<(CanonicalAddr, Coin)>, Coin), ContractError> {
+        grants: Vec<(CanonicalAddr, Vec<u128>)>,
+        budget: Option<u128>,
+    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
         // clr algorithm works with budget constrain
         if let Some(budget) = budget {
             // calculate matches sum
             let matched = CLR::calculate_matched_sum(grants);
 
             // constraint the grants by budget
-            let constrained = CLR::constrain_by_budget(matched, budget.amount.u128());
+            let constrained = CLR::constrain_by_budget(matched, budget);
 
             // calculate leftover
             let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
-            let leftover = coin(
-                budget.amount.u128() - constrained_sum,
-                budget.denom.as_str(),
-            );
-            // sanitize result
-            let res = CLR::sanitize_result(budget.denom, constrained);
-            Ok((res, leftover))
+            let leftover = budget - constrained_sum;
+            Ok((constrained, leftover))
         } else {
             Err(ContractError::CLRConstrainRequired {})
         }
@@ -63,7 +57,9 @@ impl Algo for CLR {
 
 impl CLR {
     // takes square root of each fund, sums, then squares and returns u128
-    fn calculate_matched_sum(grants: Vec<(Proposal, Vec<u128>)>) -> Vec<(Proposal, u128)> {
+    fn calculate_matched_sum(
+        grants: Vec<(CanonicalAddr, Vec<u128>)>,
+    ) -> Vec<(CanonicalAddr, u128)> {
         grants
             .iter()
             .map(|g| {
@@ -75,7 +71,10 @@ impl CLR {
     }
 
     // takes square root of each fund, sums, then squares and returns u128
-    fn constrain_by_budget(grants: Vec<(Proposal, u128)>, budget: u128) -> Vec<(Proposal, u128)> {
+    fn constrain_by_budget(
+        grants: Vec<(CanonicalAddr, u128)>,
+        budget: u128,
+    ) -> Vec<(CanonicalAddr, u128)> {
         let raw_total: u128 = grants.iter().map(|g| g.1).sum();
         grants
             .iter()
@@ -85,29 +84,12 @@ impl CLR {
             })
             .collect()
     }
-
-    // sanitize result for handler to process.
-    fn sanitize_result(
-        denom: String,
-        final_match: Vec<(Proposal, u128)>,
-    ) -> Vec<(CanonicalAddr, Coin)> {
-        final_match
-            .iter()
-            .map(|g| {
-                let (p, f) = g;
-                let fund_addr = p.clone().fund_address;
-                let c = coin(*f, denom.as_str());
-                (fund_addr, c)
-            })
-            .collect()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::matching::{QFAlgorithm, CLR};
-    use crate::state::Proposal;
-    use cosmwasm_std::{coin, CanonicalAddr};
+    use cosmwasm_std::CanonicalAddr;
 
     #[test]
     fn test_clr_1() {
@@ -133,23 +115,23 @@ mod tests {
         let votes4 = vec![60000u128];
 
         let grants = vec![
-            (proposal1.clone(), votes1),
-            (proposal2.clone(), votes2),
-            (proposal3.clone(), votes3),
-            (proposal4.clone(), votes4),
+            (proposal1.fund_address.clone(), votes1),
+            (proposal2.fund_address.clone(), votes2),
+            (proposal3.fund_address.clone(), votes3),
+            (proposal4.fund_address.clone(), votes4),
         ];
         let expected = vec![
-            (proposal1.fund_address, coin(84737u128, "ucosm")),
-            (proposal2.fund_address, coin(147966u128, "ucosm")),
-            (proposal3.fund_address, coin(52312u128, "ucosm")),
-            (proposal4.fund_address, coin(714983u128, "ucosm")),
+            (proposal1.fund_address, 84737u128),
+            (proposal2.fund_address, 147966u128),
+            (proposal3.fund_address, 52312u128),
+            (proposal4.fund_address, 714983u128),
         ];
         let algo = QFAlgorithm { algo: CLR };
-        let res = algo.distribute(grants, Some(coin(1000000u128, "ucosm")));
+        let res = algo.distribute(grants, Some(1000000u128));
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);
-                assert_eq!(o.1, coin(2, "ucosm"))
+                assert_eq!(o.1, 2)
             }
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
@@ -185,23 +167,23 @@ mod tests {
         let votes4 = vec![100000u128, 5u128];
 
         let grants = vec![
-            (proposal1.clone(), votes1),
-            (proposal2.clone(), votes2),
-            (proposal3.clone(), votes3),
-            (proposal4.clone(), votes4),
+            (proposal1.fund_address.clone(), votes1),
+            (proposal2.fund_address.clone(), votes2),
+            (proposal3.fund_address.clone(), votes3),
+            (proposal4.fund_address.clone(), votes4),
         ];
         let expected = vec![
-            (proposal1.fund_address, coin(60212u128, "ucosm")),
-            (proposal2.fund_address, coin(164602u128, "ucosm")),
-            (proposal3.fund_address, coin(228537u128, "ucosm")),
-            (proposal4.fund_address, coin(96648u128, "ucosm")),
+            (proposal1.fund_address, 60212u128),
+            (proposal2.fund_address, 164602u128),
+            (proposal3.fund_address, 228537u128),
+            (proposal4.fund_address, 96648u128),
         ];
         let algo = QFAlgorithm { algo: CLR };
-        let res = algo.distribute(grants, Some(coin(550000u128, "ucosm")));
+        let res = algo.distribute(grants, Some(550000u128));
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);
-                assert_eq!(o.1, coin(1, "ucosm"))
+                assert_eq!(o.1, 1)
             }
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
