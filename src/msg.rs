@@ -93,6 +93,7 @@ mod tests {
         }
 
         let msg3 = msg.clone();
+        let info = mock_info("creator", &[coin(4, denom.as_str()), coin(4, "test")]);
         match msg3.validate(env, &info) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::MultipleCoinsSent {}) => {}

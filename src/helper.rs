@@ -26,7 +26,7 @@ mod tests {
             Ok(cc) => assert_eq!(c, &[cc]),
             Err(err) => println!("{:?}", err),
         }
-        let info = mock_info("creator", &[coin(4, denom)]);
+        let info = mock_info("creator", &[coin(4, denom), coin(4, "test")]);
 
         match extract_funding_coin(&info.clone().sent_funds) {
             Ok(_) => panic!("expected error"),
