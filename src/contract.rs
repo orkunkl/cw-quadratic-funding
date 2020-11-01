@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use crate::error::ContractError;
 use crate::helper::extract_budget_coin;
-use crate::matching::{calculate_clr, QFAlgorithm};
+use crate::matching::{calculate_clr, QuadraticFundingAlgorithm};
 use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
@@ -209,7 +209,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     }
 
     let (distr_funds, leftover) = match config.algorithm {
-        QFAlgorithm::CapitalConstrainedLiberalRadicalism {} => {
+        QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {..} => {
             calculate_clr(grants, Some(config.budget.amount.u128()))?
         }
     };
@@ -275,7 +275,7 @@ fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use crate::contract::{handle, init, query_all_proposals, query_proposal_id};
     use crate::error::ContractError;
-    use crate::matching::QFAlgorithm;
+    use crate::matching::QuadraticFundingAlgorithm;
     use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg};
     use crate::state::{Proposal, PROPOSALS};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
@@ -295,7 +295,7 @@ mod tests {
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
             budget_denom: String::from("ucosm"),
-            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -334,7 +334,7 @@ mod tests {
             voting_period: Default::default(),
             proposal_period: Default::default(),
             budget_denom: String::from("ucosm"),
-            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
@@ -354,7 +354,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
-            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
             admin: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
@@ -430,7 +430,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
-            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
             admin: HumanAddr::from("admin"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,

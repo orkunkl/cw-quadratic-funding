@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QFAlgorithm {
-    CapitalConstrainedLiberalRadicalism {},
+pub enum QuadraticFundingAlgorithm {
+    CapitalConstrainedLiberalRadicalism { parameter: String },
 }
 
 pub fn calculate_clr(

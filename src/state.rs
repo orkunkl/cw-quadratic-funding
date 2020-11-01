@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::matching::QFAlgorithm;
+use crate::matching::QuadraticFundingAlgorithm;
 use cosmwasm_std::{Binary, CanonicalAddr, Coin, Storage};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
@@ -16,7 +16,7 @@ pub struct Config {
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
     pub budget: Coin,
-    pub algorithm: QFAlgorithm,
+    pub algorithm: QuadraticFundingAlgorithm,
 }
 
 pub const CONFIG: Item<Config> = Item::new(b"config");

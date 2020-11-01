@@ -1,5 +1,5 @@
 use crate::error::ContractError;
-use crate::matching::QFAlgorithm;
+use crate::matching::QuadraticFundingAlgorithm;
 use crate::state::Proposal;
 use cosmwasm_std::{Binary, Env, HumanAddr};
 use cw0::Expiration;
@@ -15,7 +15,7 @@ pub struct InitMsg {
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
     pub budget_denom: String,
-    pub algorithm: QFAlgorithm,
+    pub algorithm: QuadraticFundingAlgorithm,
 }
 
 impl InitMsg {
@@ -77,7 +77,7 @@ mod tests {
             voting_period: Default::default(),
             proposal_period: Default::default(),
             budget_denom: "".to_string(),
-            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
 
         let mut msg1 = msg.clone();
