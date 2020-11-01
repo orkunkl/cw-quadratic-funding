@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use cosmwasm_std::CanonicalAddr;
-use num_integer::Roots;
+use integer_sqrt::IntegerSquareRoot;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -39,7 +39,7 @@ fn calculate_matched_sum(grants: Vec<(CanonicalAddr, Vec<u128>)>) -> Vec<(Canoni
         .into_iter()
         .map(|g| {
             let (proposal, votes) = g;
-            let sum_sqrts: u128 = votes.iter().map(|v| v.sqrt()).sum();
+            let sum_sqrts: u128 = votes.into_iter().map(|v| v.integer_sqrt()).sum();
             (proposal, sum_sqrts * sum_sqrts)
         })
         .collect()
