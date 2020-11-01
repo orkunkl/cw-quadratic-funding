@@ -21,10 +21,26 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     msg.validate(env)?;
 
     let budget = extract_budget_coin(info.sent_funds.as_slice(), msg.budget_denom)?;
+    let mut create_proposal_whitelist: Option<Vec<CanonicalAddr>> = None;
+    let mut vote_proposal_whitelist: Option<Vec<CanonicalAddr>> = None;
+    if let Some(pwl) = msg.create_proposal_whitelist {
+        let mut tmp_wl = vec![];
+        for w in pwl {
+            tmp_wl.push(deps.api.canonical_address(&w)?)
+        }
+        create_proposal_whitelist = Some(tmp_wl);
+    }
+    if let Some(vwl) = msg.vote_proposal_whitelist {
+        let mut tmp_wl = vec![];
+        for w in vwl {
+            tmp_wl.push(deps.api.canonical_address(&w)?)
+        }
+        vote_proposal_whitelist = Some(tmp_wl);
+    }
     let cfg = Config {
         admin: deps.api.canonical_address(&msg.admin)?,
-        create_proposal_whitelist: msg.create_proposal_whitelist,
-        vote_proposal_whitelist: msg.vote_proposal_whitelist,
+        create_proposal_whitelist,
+        vote_proposal_whitelist,
         voting_period: msg.voting_period,
         proposal_period: msg.proposal_period,
         algorithm: msg.algorithm,
@@ -69,7 +85,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
 
     // check whitelist
     if let Some(wl) = config.create_proposal_whitelist {
-        if !wl.contains(&info.sender) {
+        if !wl.contains(&deps.api.canonical_address(&info.sender)?) {
             return Err(ContractError::Unauthorized {});
         }
     }
@@ -112,7 +128,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
 
     // check whitelist
     if let Some(wl) = config.vote_proposal_whitelist {
-        if !wl.contains(&info.sender) {
+        if !wl.contains(&deps.api.canonical_address(&info.sender)?) {
             return Err(ContractError::Unauthorized {});
         }
     }

@@ -25,7 +25,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/HumanAddr"
+        "$ref": "#/definitions/CanonicalAddr"
       }
     },
     "proposal_period": {
@@ -37,7 +37,7 @@
         "null"
       ],
       "items": {
-        "$ref": "#/definitions/HumanAddr"
+        "$ref": "#/definitions/CanonicalAddr"
       }
     },
     "voting_period": {
@@ -111,9 +111,6 @@
           }
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "QFAlgorithm": {
       "anyOf": [
