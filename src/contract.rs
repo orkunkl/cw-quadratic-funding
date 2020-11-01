@@ -20,7 +20,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 ) -> Result<InitResponse, ContractError> {
     msg.validate(env)?;
 
-    let budget = extract_budget_coin(info.sent_funds.as_slice(), msg.budget_denom)?;
+    let budget = extract_budget_coin(info.sent_funds.as_slice(), &msg.budget_denom)?;
     let mut create_proposal_whitelist: Option<Vec<CanonicalAddr>> = None;
     let mut vote_proposal_whitelist: Option<Vec<CanonicalAddr>> = None;
     if let Some(pwl) = msg.create_proposal_whitelist {
@@ -139,7 +139,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     }
 
     // validate sent funds and funding denom matches
-    let fund = extract_budget_coin(&info.sent_funds, config.budget.denom.clone())?;
+    let fund = extract_budget_coin(&info.sent_funds, &config.budget.denom)?;
 
     // check proposal exists
     PROPOSALS.load(&deps.storage, proposal_id.into())?;

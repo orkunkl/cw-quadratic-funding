@@ -2,13 +2,13 @@ use crate::error::ContractError;
 use cosmwasm_std::Coin;
 
 // extract budget coin validate against sent_funds.denom
-pub fn extract_budget_coin(sent_funds: &[Coin], denom: String) -> Result<Coin, ContractError> {
+pub fn extract_budget_coin(sent_funds: &[Coin], denom: &str) -> Result<Coin, ContractError> {
     if sent_funds.len() != 1 {
         return Err(ContractError::MultipleCoinsSent {});
     }
-    if sent_funds[0].denom != denom {
+    if sent_funds[0].denom != *denom {
         return Err(ContractError::WrongFundCoin {
-            expected: denom,
+            expected: denom.to_string(),
             got: sent_funds[0].denom.clone(),
         });
     }
@@ -28,14 +28,14 @@ mod tests {
         let c = &[coin(4, denom)];
         let info = mock_info("creator", c);
 
-        let res = extract_budget_coin(&info.sent_funds, denom.to_string());
+        let res = extract_budget_coin(&info.sent_funds, &denom.to_string());
         match res {
             Ok(cc) => assert_eq!(c, &[cc]),
             Err(err) => println!("{:?}", err),
         }
         let info = mock_info("creator", &[coin(4, denom), coin(4, "test")]);
 
-        match extract_budget_coin(&info.clone().sent_funds, denom.to_string()) {
+        match extract_budget_coin(&info.clone().sent_funds, &denom.to_string()) {
             Ok(_) => panic!("expected error"),
             Err(ContractError::MultipleCoinsSent { .. }) => {}
             Err(err) => println!("{:?}", err),
