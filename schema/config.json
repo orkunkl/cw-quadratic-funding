@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "admin",
+    "algorithm",
     "budget",
     "proposal_period",
     "voting_period"
@@ -11,6 +12,9 @@
   "properties": {
     "admin": {
       "$ref": "#/definitions/CanonicalAddr"
+    },
+    "algorithm": {
+      "$ref": "#/definitions/QFAlgorithm"
     },
     "budget": {
       "$ref": "#/definitions/Coin"
@@ -110,6 +114,21 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "QFAlgorithm": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "capital_constrained_liberal_radicalism"
+          ],
+          "properties": {
+            "capital_constrained_liberal_radicalism": {
+              "type": "object"
+            }
+          }
+        }
+      ]
     },
     "Uint128": {
       "type": "string"

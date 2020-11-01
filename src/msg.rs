@@ -1,11 +1,12 @@
 use crate::error::ContractError;
+use crate::matching::QFAlgorithm;
 use crate::state::Proposal;
 use cosmwasm_std::{Binary, Env, HumanAddr};
 use cw0::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct InitMsg {
     pub admin: HumanAddr,
@@ -14,6 +15,7 @@ pub struct InitMsg {
     pub voting_period: Expiration,
     pub proposal_period: Expiration,
     pub budget_denom: String,
+    pub algorithm: QFAlgorithm,
 }
 
 impl InitMsg {
@@ -69,7 +71,13 @@ mod tests {
 
         env.block.height = 30;
         let msg = InitMsg {
-            ..Default::default()
+            admin: Default::default(),
+            create_proposal_whitelist: None,
+            vote_proposal_whitelist: None,
+            voting_period: Default::default(),
+            proposal_period: Default::default(),
+            budget_denom: "".to_string(),
+            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
 
         let mut msg1 = msg.clone();

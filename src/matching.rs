@@ -1,96 +1,68 @@
 use crate::error::ContractError;
 use cosmwasm_std::CanonicalAddr;
 use num_integer::Roots;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-pub struct QFAlgorithm<S: Algo> {
-    pub(crate) algo: S,
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QFAlgorithm {
+    CapitalConstrainedLiberalRadicalism {},
 }
 
-impl<S> QFAlgorithm<S>
-where
-    S: Algo,
-{
-    pub fn distribute(
-        &self,
-        grants: Vec<(CanonicalAddr, Vec<u128>)>,
-        budget: Option<u128>,
-    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
-        self.algo.distribute(grants, budget)
+pub fn calculate_clr(
+    grants: Vec<(CanonicalAddr, Vec<u128>)>,
+    budget: Option<u128>,
+) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
+    // clr algorithm works with budget constrain
+    if let Some(budget) = budget {
+        // calculate matches sum
+        let matched = calculate_matched_sum(grants);
+
+        // constraint the grants by budget
+        let constrained = constrain_by_budget(matched, budget);
+
+        // calculate leftover
+        let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
+        // shouldn't be used with tokens with > 10 decimal points
+        // will cause overflow and panic on the during execution.
+        let leftover = budget - constrained_sum;
+        Ok((constrained, leftover))
+    } else {
+        Err(ContractError::CLRConstrainRequired {})
     }
 }
 
-pub trait Algo {
-    // takes grantes denom and budget, returns "fund_address" -> "grant" vector and left over tokens to return
-    fn distribute(
-        &self,
-        grants: Vec<(CanonicalAddr, Vec<u128>)>,
-        budget: Option<u128>,
-    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError>;
+// takes square root of each fund, sums, then squares and returns u128
+fn calculate_matched_sum(grants: Vec<(CanonicalAddr, Vec<u128>)>) -> Vec<(CanonicalAddr, u128)> {
+    grants
+        .into_iter()
+        .map(|g| {
+            let (proposal, votes) = g;
+            let sum_sqrts: u128 = votes.iter().map(|v| v.sqrt()).sum();
+            (proposal, sum_sqrts * sum_sqrts)
+        })
+        .collect()
 }
 
-pub struct CLR;
-
-impl Algo for CLR {
-    // takes (proposal, votes) tuple vector returns (fund address, coin) to be executed
-    fn distribute(
-        &self,
-        grants: Vec<(CanonicalAddr, Vec<u128>)>,
-        budget: Option<u128>,
-    ) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
-        // clr algorithm works with budget constrain
-        if let Some(budget) = budget {
-            // calculate matches sum
-            let matched = CLR::calculate_matched_sum(grants);
-
-            // constraint the grants by budget
-            let constrained = CLR::constrain_by_budget(matched, budget);
-
-            // calculate leftover
-            let constrained_sum: u128 = constrained.iter().map(|c| c.1).sum();
-            // shouldn't be used with tokens with > 10 decimal points
-            // will cause overflow and panic on the during execution.
-            let leftover = budget - constrained_sum;
-            Ok((constrained, leftover))
-        } else {
-            Err(ContractError::CLRConstrainRequired {})
-        }
-    }
-}
-
-impl CLR {
-    // takes square root of each fund, sums, then squares and returns u128
-    fn calculate_matched_sum(
-        grants: Vec<(CanonicalAddr, Vec<u128>)>,
-    ) -> Vec<(CanonicalAddr, u128)> {
-        grants
-            .into_iter()
-            .map(|g| {
-                let (proposal, votes) = g;
-                let sum_sqrts: u128 = votes.iter().map(|v| v.sqrt()).sum();
-                (proposal, sum_sqrts * sum_sqrts)
-            })
-            .collect()
-    }
-
-    // takes square root of each fund, sums, then squares and returns u128
-    fn constrain_by_budget(
-        grants: Vec<(CanonicalAddr, u128)>,
-        budget: u128,
-    ) -> Vec<(CanonicalAddr, u128)> {
-        let raw_total: u128 = grants.iter().map(|g| g.1).sum();
-        grants
-            .into_iter()
-            .map(|g| {
-                let (proposal, grant) = g;
-                (proposal, (grant * budget) / raw_total)
-            })
-            .collect()
-    }
+// takes square root of each fund, sums, then squares and returns u128
+fn constrain_by_budget(
+    grants: Vec<(CanonicalAddr, u128)>,
+    budget: u128,
+) -> Vec<(CanonicalAddr, u128)> {
+    let raw_total: u128 = grants.iter().map(|g| g.1).sum();
+    grants
+        .into_iter()
+        .map(|g| {
+            let (proposal, grant) = g;
+            (proposal, (grant * budget) / raw_total)
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::matching::{QFAlgorithm, CLR};
+    use crate::matching::calculate_clr;
     use crate::state::Proposal;
     use cosmwasm_std::CanonicalAddr;
 
@@ -129,8 +101,7 @@ mod tests {
             (proposal3.fund_address, 52312u128),
             (proposal4.fund_address, 714983u128),
         ];
-        let algo = QFAlgorithm { algo: CLR };
-        let res = algo.distribute(grants, Some(1000000u128));
+        let res = calculate_clr(grants, Some(1000000u128));
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);
@@ -181,8 +152,7 @@ mod tests {
             (proposal3.fund_address, 228537u128),
             (proposal4.fund_address, 96648u128),
         ];
-        let algo = QFAlgorithm { algo: CLR };
-        let res = algo.distribute(grants, Some(550000u128));
+        let res = calculate_clr(grants, Some(550000u128));
         match res {
             Ok(o) => {
                 assert_eq!(o.0, expected);

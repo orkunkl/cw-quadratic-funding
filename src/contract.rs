@@ -1,11 +1,11 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
+    attr, coin, to_binary, Api, BankMsg, Binary, CanonicalAddr, CosmosMsg, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
 use crate::error::ContractError;
 use crate::helper::extract_budget_coin;
-use crate::matching::{QFAlgorithm, CLR};
+use crate::matching::{calculate_clr, QFAlgorithm};
 use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
@@ -27,6 +27,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         vote_proposal_whitelist: msg.vote_proposal_whitelist,
         voting_period: msg.voting_period,
         proposal_period: msg.proposal_period,
+        algorithm: msg.algorithm,
         budget,
     };
     CONFIG.save(&mut deps.storage, &cfg)?;
@@ -177,7 +178,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     let proposals: Vec<Proposal> = query_proposals?.into_iter().map(|p| p.1).collect();
 
-    let mut grants: Vec<(Proposal, Vec<u128>)> = vec![];
+    let mut grants: Vec<(CanonicalAddr, Vec<u128>)> = vec![];
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
             .prefix(p.id.into())
@@ -188,18 +189,14 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         for v in vote_query? {
             votes.push(v.1.fund.amount.u128());
         }
-        grants.push((p, votes));
+        grants.push((p.fund_address, votes));
     }
 
-    // TODO make customizable
-    let algo = QFAlgorithm { algo: CLR {} };
-    let pre_process = grants
-        .into_iter()
-        .map(|g| (g.0.fund_address, g.1))
-        .collect();
-
-    let (distr_funds, leftover) =
-        algo.distribute(pre_process, Some(config.budget.amount.u128()))?;
+    let (distr_funds, leftover) = match config.algorithm {
+        QFAlgorithm::CapitalConstrainedLiberalRadicalism {} => {
+            calculate_clr(grants, Some(config.budget.amount.u128()))?
+        }
+    };
 
     let mut msgs = vec![];
     for f in distr_funds {
@@ -262,6 +259,7 @@ fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use crate::contract::{handle, init, query_all_proposals, query_proposal_id};
     use crate::error::ContractError;
+    use crate::matching::QFAlgorithm;
     use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg};
     use crate::state::{Proposal, PROPOSALS};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
@@ -281,6 +279,7 @@ mod tests {
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
             budget_denom: String::from("ucosm"),
+            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -315,8 +314,11 @@ mod tests {
         let init_msg = InitMsg {
             admin: HumanAddr::from("person"),
             create_proposal_whitelist: Some(vec![HumanAddr::from("false")]),
+            vote_proposal_whitelist: None,
+            voting_period: Default::default(),
+            proposal_period: Default::default(),
             budget_denom: String::from("ucosm"),
-            ..Default::default()
+            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
@@ -336,6 +338,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
+            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
             admin: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
@@ -411,6 +414,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
+            algorithm: QFAlgorithm::CapitalConstrainedLiberalRadicalism {},
             admin: HumanAddr::from("admin"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,

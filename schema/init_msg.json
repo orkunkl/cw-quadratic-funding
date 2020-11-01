@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "admin",
+    "algorithm",
     "budget_denom",
     "proposal_period",
     "voting_period"
@@ -11,6 +12,9 @@
   "properties": {
     "admin": {
       "$ref": "#/definitions/HumanAddr"
+    },
+    "algorithm": {
+      "$ref": "#/definitions/QFAlgorithm"
     },
     "budget_denom": {
       "type": "string"
@@ -88,6 +92,21 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "QFAlgorithm": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "capital_constrained_liberal_radicalism"
+          ],
+          "properties": {
+            "capital_constrained_liberal_radicalism": {
+              "type": "object"
+            }
+          }
+        }
+      ]
     }
   }
 }
