@@ -166,7 +166,7 @@ interface QuadraticFundingInstance {
   proposal: (id: number) => Promise<Proposal>
 
   // actions
-  createProposal: (name: string, title: string, description: string, fundAddress: string , amount: readonly Coin[], metadata?: BinaryType) => Promise<string>
+  createProposal: (title: string, description: string, fundAddress: string , amount: readonly Coin[], metadata?: BinaryType) => Promise<string>
   voteProposal: (proposalId: number, amount: readonly Coin[]) => Promise<any>
   triggerDistribution: () => Promise<any>
 }
@@ -185,8 +185,8 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
       return client.queryContractSmart(contractAddress, {proposal: { id}});
     };
 
-      const createProposal = async (name: string, title: string, description: string , fundAddress: string , amount: readonly Coin[], metadata?: BinaryType): Promise<string> => {
-      const result = await client.execute(contractAddress, {create_proposal: { name, title, description, fundAddress, metadata}}, "", amount);
+      const createProposal = async (title: string, description: string , fundAddress: string , amount: readonly Coin[], metadata?: BinaryType): Promise<string> => {
+      const result = await client.execute(contractAddress, {create_proposal: { title, description, fundAddress, metadata}}, "", amount);
       return result.transactionHash;
     };
 
@@ -243,7 +243,7 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
 //
 // const codeId = await factory.upload();
 // codeId -> 12
-// const initMsg = { admin: "cosmos1z5huy8upud7jm4p62h3m2dtuae7anfnwx3mx8w", voting_period: { at_height: "257600" }, proposal_period: { at_height: 257600 }, budget_denom: "ucosm", quadratic_funding_algorithm: {capital_constrained_liberal_radicalism: {params: "param"}}}
+// const initMsg = { admin: "cosmos1t6a7zh7s5c2hr7hwdhv6x86ddej2mum2gwy8z4", voting_period: { at_height: "257600" }, proposal_period: { at_height: 257600 }, budget_denom: "ucosm", quadratic_funding_algorithm: {capital_constrained_liberal_radicalism: {params: "param"}}}
 // const contract = await factory.instantiate(90, initMsg, "cw1-subkey test")
 // contract.contractAddress -> 'coral1267wq2zk22kt5juypdczw3k4wxhc4z47mug9fd'
 //
@@ -253,7 +253,8 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
 //
 // const randomAddress = 'cosmos12my0yfs9ft4kafrzy0p2r7dn2ppd8zu65ll0ay'
 //
-// contract.config()
+// contract.createProposal("title", "desc", "cosmos10g4t8zcz7w8yeh0hufsyn9jluju64vnyll7luw", [{amount: 10000, denom: "ucosm"])
+
 // contract.register("name", "some metadata", [{"denom": "ucosm", amount: "4000" }])
 // contract.record("name")
 // contract.transfer("name", randomAddress, [{"denom": "ushell", amount: "2000" }])

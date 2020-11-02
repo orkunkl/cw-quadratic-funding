@@ -1,1 +1,1 @@
-d3fb1beed93eaa0a4a4be0f3ee594015df223a1455241051fbcdb7a9b9111898  cw_quadratic_funding.wasm
+48f8650d664f3e28890b317e6014712c5aca10eafa101f3a0b8d7840f1612344  cw_quadratic_funding.wasm
