@@ -11,6 +11,8 @@ use cw_storage_plus::{Item, Map, U64Key};
 pub struct Config {
     // set admin as single address, multisig or contract sig could be used
     pub admin: CanonicalAddr,
+    // leftover coins from distribution sent to this address
+    pub leftover_addr: CanonicalAddr,
     pub create_proposal_whitelist: Option<Vec<CanonicalAddr>>,
     pub vote_proposal_whitelist: Option<Vec<CanonicalAddr>>,
     pub voting_period: Expiration,

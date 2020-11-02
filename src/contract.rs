@@ -39,6 +39,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     }
     let cfg = Config {
         admin: deps.api.canonical_address(&msg.admin)?,
+        leftover_addr: deps.api.canonical_address(&msg.leftover_addr)?,
         create_proposal_whitelist,
         vote_proposal_whitelist,
         voting_period: msg.voting_period,
@@ -240,8 +241,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     let leftover_msg: CosmosMsg = CosmosMsg::Bank(BankMsg::Send {
         from_address: env.contract.address,
-        // TODO: send to funder addr
-        to_address: deps.api.human_address(&config.admin)?,
+        to_address: deps.api.human_address(&config.leftover_addr)?,
         amount: vec![coin(leftover, config.budget.denom)],
     });
 
@@ -305,6 +305,7 @@ mod tests {
 
         let init_msg = InitMsg {
             admin: HumanAddr::from("addr"),
+            leftover_addr: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Expiration::AtHeight(env.block.height + 15),
@@ -345,6 +346,7 @@ mod tests {
         let info = mock_info("true", &[coin(1000, "ucosm")]);
         let mut deps = mock_dependencies(&[]);
         let init_msg = InitMsg {
+            leftover_addr: HumanAddr::from("addr"),
             admin: HumanAddr::from("person"),
             create_proposal_whitelist: Some(vec![HumanAddr::from("false")]),
             vote_proposal_whitelist: None,
@@ -373,6 +375,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
+            leftover_addr: HumanAddr::from("addr"),
             algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
                 parameter: "".to_string(),
             },
@@ -452,6 +455,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
+            leftover_addr: HumanAddr::from("addr"),
             algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
                 parameter: "".to_string(),
             },
@@ -605,7 +609,7 @@ mod tests {
             // left over msg
             CosmosMsg::Bank(BankMsg::Send {
                 from_address: env.contract.address.clone(),
-                to_address: HumanAddr::from("admin"),
+                to_address: HumanAddr::from("addr"),
                 amount: vec![coin(1u128, "ucosm")],
             }),
         ];

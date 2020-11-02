@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub struct InitMsg {
     pub admin: HumanAddr,
+    pub leftover_addr: HumanAddr,
     pub create_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
     pub voting_period: Expiration,
@@ -72,6 +73,7 @@ mod tests {
         env.block.height = 30;
         let msg = InitMsg {
             admin: Default::default(),
+            leftover_addr: Default::default(),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
             voting_period: Default::default(),
