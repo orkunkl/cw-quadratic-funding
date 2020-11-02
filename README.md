@@ -31,56 +31,66 @@ First iteration will only support single type of native coin.
 
 ```rust
 pub struct InitMsg {
-    create_proposal_whitelist: Option<Vec<HumanAddr>>,
-    vote_proposal_whitelist: Option<Vec<HumanAddr>>,
-    voting_period: Expiration,
-    proposal_period: Expiration,
-    coin_denom: String,
+    pub admin: HumanAddr,
+    pub leftover_addr: HumanAddr,
+    pub create_proposal_whitelist: Option<Vec<HumanAddr>>,
+    pub vote_proposal_whitelist: Option<Vec<HumanAddr>>,
+    pub voting_period: Expiration,
+    pub proposal_period: Expiration,
+    pub budget_denom: String,
+    pub algorithm: QuadraticFundingAlgorithm,
 }
 
-enum HandleMsg {
+pub enum HandleMsg {
     CreateProposal {
+        title: String,
         description: String,
-        metadata: String,
-        fund_address: HumanAddr
+        metadata: Option<Binary>,
+        fund_address: HumanAddr,
     },
     VoteProposal {
-        proposal_id: u32,
+        proposal_id: u64,
     },
-    TriggerDistribution {
-        proposal_id: u32
-    },
+    TriggerDistribution {},
 }
 ```
 
 ### State
 
 ```rust
-pub struct Proposal {
-    id: u32,
-    title: String,
-    metadata: String,
-    fund_address: HumanAddr,
+pub struct Config {
+    // set admin as single address, multisig or contract sig could be used
+    pub admin: CanonicalAddr,
+    // leftover coins from distribution sent to this address
+    pub leftover_addr: CanonicalAddr,
+    pub create_proposal_whitelist: Option<Vec<CanonicalAddr>>,
+    pub vote_proposal_whitelist: Option<Vec<CanonicalAddr>>,
+    pub voting_period: Expiration,
+    pub proposal_period: Expiration,
+    pub budget: Coin,
+    pub algorithm: QuadraticFundingAlgorithm,
 }
 
+pub struct Proposal {
+    pub id: u64,
+    pub title: String,
+    pub description: String,
+    pub metadata: Option<Binary>,
+    pub fund_address: CanonicalAddr,
+    pub collected_funds: Uint128,
+}
 pub struct Vote {
-    id: u32,
-    proposal_id: u32,
-    voter: HumanAddr,
-    fund: Coin,
+    pub proposal_id: u64,
+    pub voter: CanonicalAddr,
+    pub fund: Coin,
 }
 ```
 
 ### Queries
 
 ```rust
-enum QueryMsg {
-    ProposalByID {
-        id: u64,
-    },
-    ProposalByFundAddress {
-        fund_address: HumanAddr
-    },
+pub enum QueryMsg {
+    ProposalByID { id: u64 },
     AllProposals {},
 }
 ```
