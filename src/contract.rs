@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use crate::error::ContractError;
 use crate::helper::extract_budget_coin;
-use crate::matching::{calculate_clr, QuadraticFundingAlgorithm};
+use crate::matching::{calculate_clr, QuadraticFundingAlgorithm, RawGrant};
 use crate::msg::{AllProposalsResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{proposal_seq, Config, Proposal, Vote, CONFIG, PROPOSALS, VOTES};
 use cosmwasm_storage::nextval;
@@ -202,7 +202,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     let proposals: Vec<Proposal> = query_proposals?.into_iter().map(|p| p.1).collect();
 
-    let mut grants: Vec<(CanonicalAddr, Vec<u128>, u128)> = vec![];
+    let mut grants: Vec<RawGrant> = vec![];
     // collect proposals under grants
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
@@ -214,7 +214,13 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         for v in vote_query? {
             votes.push(v.1.fund.amount.u128());
         }
-        grants.push((p.fund_address, votes, p.collected_funds.u128()));
+        let grant = RawGrant {
+            addr: p.fund_address,
+            funds: votes,
+            collected_vote_funds: p.collected_funds.u128(),
+        };
+
+        grants.push(grant);
     }
 
     let (distr_funds, leftover) = match config.algorithm {
@@ -227,8 +233,8 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     for f in distr_funds {
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
             from_address: env.contract.address.clone(),
-            to_address: deps.api.human_address(&f.0)?,
-            amount: vec![coin(f.1 + f.2, &config.budget.denom)],
+            to_address: deps.api.human_address(&f.addr)?,
+            amount: vec![coin(f.grant + f.collected_vote_funds, &config.budget.denom)],
         }));
     }
 
