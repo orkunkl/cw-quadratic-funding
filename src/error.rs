@@ -8,6 +8,28 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Proposal not found")]
+    ProposalNotFound {},
+
+    #[error("Proposal period expired")]
+    ProposalPeriodExpired {},
+
+    #[error("Voting period expired")]
+    VotingPeriodExpired {},
+
+    #[error("Voting period not expired")]
+    VotingPeriodNotExpired {},
+
+    #[error("Multiple coin type sent")]
+    MultipleCoinsSent {},
+
+    #[error("Wrong fund coin (expected: {expected}, got: {got})")]
+    WrongFundCoin { expected: String, got: String },
+
+    #[error("Address already voted project")]
+    AddressAlreadyVotedProject {},
+
+    #[error("CLR algorithm requires a budget constrain")]
+    CLRConstrainRequired {},
 }
