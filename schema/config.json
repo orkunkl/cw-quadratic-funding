@@ -14,7 +14,7 @@
       "$ref": "#/definitions/CanonicalAddr"
     },
     "algorithm": {
-      "$ref": "#/definitions/QFAlgorithm"
+      "$ref": "#/definitions/QuadraticFundingAlgorithm"
     },
     "budget": {
       "$ref": "#/definitions/Coin"
@@ -112,7 +112,7 @@
         }
       ]
     },
-    "QFAlgorithm": {
+    "QuadraticFundingAlgorithm": {
       "anyOf": [
         {
           "type": "object",
@@ -121,7 +121,15 @@
           ],
           "properties": {
             "capital_constrained_liberal_radicalism": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "parameter"
+              ],
+              "properties": {
+                "parameter": {
+                  "type": "string"
+                }
+              }
             }
           }
         }

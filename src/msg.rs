@@ -77,7 +77,9 @@ mod tests {
             voting_period: Default::default(),
             proposal_period: Default::default(),
             budget_denom: "".to_string(),
-            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
+                parameter: "".to_string(),
+            },
         };
 
         let mut msg1 = msg.clone();

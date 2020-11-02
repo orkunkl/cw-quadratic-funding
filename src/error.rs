@@ -9,6 +9,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Proposal not found")]
+    ProposalNotFound {},
+
     #[error("Proposal period expired")]
     ProposalPeriodExpired {},
 

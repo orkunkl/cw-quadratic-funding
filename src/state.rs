@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::matching::QuadraticFundingAlgorithm;
-use cosmwasm_std::{Binary, CanonicalAddr, Coin, Storage};
+use cosmwasm_std::{Binary, CanonicalAddr, Coin, Storage, Uint128};
 use cosmwasm_storage::{singleton, Singleton};
 use cw0::Expiration;
 use cw_storage_plus::{Item, Map, U64Key};
@@ -28,6 +28,7 @@ pub struct Proposal {
     pub description: String,
     pub metadata: Option<Binary>,
     pub fund_address: CanonicalAddr,
+    pub collected_funds: Uint128,
 }
 
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposal");

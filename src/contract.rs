@@ -102,6 +102,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
         description,
         metadata,
         fund_address: deps.api.canonical_address(&fund_address)?,
+        ..Default::default()
     };
     PROPOSALS.save(&mut deps.storage, id.into(), &p)?;
 
@@ -141,8 +142,14 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     // validate sent funds and funding denom matches
     let fund = extract_budget_coin(&info.sent_funds, &config.budget.denom)?;
 
-    // check proposal exists
-    PROPOSALS.load(&deps.storage, proposal_id.into())?;
+    // check existence of the proposal and collect funds in proposal
+    let proposal = PROPOSALS.update(&mut deps.storage, proposal_id.into(), |op| match op {
+        None => Err(ContractError::ProposalNotFound {}),
+        Some(mut proposal) => {
+            proposal.collected_funds += fund.amount;
+            Ok(proposal)
+        }
+    })?;
 
     let vote = Vote {
         proposal_id,
@@ -164,6 +171,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
             attr("action", "vote_proposal"),
             attr("proposal_key", proposal_id),
             attr("voter", deps.api.human_address(&vote.voter)?),
+            attr("collected_fund", proposal.collected_funds),
         ],
         ..Default::default()
     };
@@ -194,7 +202,8 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
 
     let proposals: Vec<Proposal> = query_proposals?.into_iter().map(|p| p.1).collect();
 
-    let mut grants: Vec<(CanonicalAddr, Vec<u128>)> = vec![];
+    let mut grants: Vec<(CanonicalAddr, Vec<u128>, u128)> = vec![];
+    // collect proposals under grants
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
             .prefix(p.id.into())
@@ -205,11 +214,11 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         for v in vote_query? {
             votes.push(v.1.fund.amount.u128());
         }
-        grants.push((p.fund_address, votes));
+        grants.push((p.fund_address, votes, p.collected_funds.u128()));
     }
 
     let (distr_funds, leftover) = match config.algorithm {
-        QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {..} => {
+        QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism { .. } => {
             calculate_clr(grants, Some(config.budget.amount.u128()))?
         }
     };
@@ -219,7 +228,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
         msgs.push(CosmosMsg::Bank(BankMsg::Send {
             from_address: env.contract.address.clone(),
             to_address: deps.api.human_address(&f.0)?,
-            amount: vec![coin(f.clone().1, &config.budget.denom)],
+            amount: vec![coin(f.1 + f.2, &config.budget.denom)],
         }));
     }
 
@@ -295,7 +304,9 @@ mod tests {
             voting_period: Expiration::AtHeight(env.block.height + 15),
             proposal_period: Expiration::AtHeight(env.block.height + 10),
             budget_denom: String::from("ucosm"),
-            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
+                parameter: "".to_string(),
+            },
         };
 
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
@@ -334,7 +345,9 @@ mod tests {
             voting_period: Default::default(),
             proposal_period: Default::default(),
             budget_denom: String::from("ucosm"),
-            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
+                parameter: "".to_string(),
+            },
         };
         init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
 
@@ -354,7 +367,9 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let mut init_msg = InitMsg {
-            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
+                parameter: "".to_string(),
+            },
             admin: HumanAddr::from("addr"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
@@ -426,11 +441,14 @@ mod tests {
     #[test]
     fn trigger_distribution() {
         let env = mock_env();
-        let info = mock_info("admin", &[coin(550000u128, "ucosm")]);
+        let budget = 550000u128;
+        let info = mock_info("admin", &[coin(budget, "ucosm")]);
         let mut deps = mock_dependencies(&[]);
 
         let init_msg = InitMsg {
-            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {},
+            algorithm: QuadraticFundingAlgorithm::CapitalConstrainedLiberalRadicalism {
+                parameter: "".to_string(),
+            },
             admin: HumanAddr::from("admin"),
             create_proposal_whitelist: None,
             vote_proposal_whitelist: None,
@@ -492,49 +510,64 @@ mod tests {
         // insert votes
         // proposal1
         let msg = HandleMsg::VoteProposal { proposal_id: 1 };
-        let info = mock_info("address1", &[coin(1200u128, "ucosm")]);
+        let vote11_fund = 1200u128;
+        let info = mock_info("address1", &[coin(vote11_fund, "ucosm")]);
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
-        let info = mock_info("address2", &[coin(44999u128, "ucosm")]);
+
+        let vote12_fund = 44999u128;
+        let info = mock_info("address2", &[coin(vote12_fund, "ucosm")]);
         handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
-        let info = mock_info("address3", &[coin(33u128, "ucosm")]);
+        let vote13_fund = 33u128;
+        let info = mock_info("address3", &[coin(vote13_fund, "ucosm")]);
         handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        let proposal1 = vote11_fund + vote12_fund + vote13_fund;
 
         // proposal2
         let msg = HandleMsg::VoteProposal { proposal_id: 2 };
-        let info = mock_info("address4", &[coin(30000u128, "ucosm")]);
+
+        let vote21_fund = 30000u128;
+        let info = mock_info("address4", &[coin(vote21_fund, "ucosm")]);
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
-        let info = mock_info("address5", &[coin(58999u128, "ucosm")]);
+        let vote22_fund = 58999u128;
+        let info = mock_info("address5", &[coin(vote22_fund, "ucosm")]);
         handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        let proposal2 = vote21_fund + vote22_fund;
 
         // proposal3
         let msg = HandleMsg::VoteProposal { proposal_id: 3 };
-        let info = mock_info("address6", &[coin(230000u128, "ucosm")]);
+        let vote31_fund = 230000u128;
+        let info = mock_info("address6", &[coin(vote31_fund, "ucosm")]);
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
-        let info = mock_info("address7", &[coin(100u128, "ucosm")]);
+        let vote32_fund = 100u128;
+        let info = mock_info("address7", &[coin(vote32_fund, "ucosm")]);
         handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        let proposal3 = vote31_fund + vote32_fund;
 
         // proposal4
         let msg = HandleMsg::VoteProposal { proposal_id: 4 };
-        let info = mock_info("address8", &[coin(100000u128, "ucosm")]);
+        let vote41_fund = 100000u128;
+        let info = mock_info("address8", &[coin(vote41_fund, "ucosm")]);
         let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
-        let info = mock_info("address9", &[coin(5u128, "ucosm")]);
+        let vote42_fund = 5u128;
+        let info = mock_info("address9", &[coin(vote42_fund, "ucosm")]);
         handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        let proposal4 = vote41_fund + vote42_fund;
 
         let trigger_msg = HandleMsg::TriggerDistribution {};
         let info = mock_info("admin", &[]);
@@ -542,26 +575,26 @@ mod tests {
         env.block.height += 1000;
         let res = handle(&mut deps, env.clone(), info, trigger_msg);
 
-        let expected_msgs = vec![
+        let expected_msgs: Vec<CosmosMsg<_>> = vec![
             CosmosMsg::Bank(BankMsg::Send {
                 from_address: env.contract.address.clone(),
                 to_address: HumanAddr::from("fund_address1"),
-                amount: vec![coin(60212u128, "ucosm")],
+                amount: vec![coin(106444u128, "ucosm")],
             }),
             CosmosMsg::Bank(BankMsg::Send {
                 from_address: env.contract.address.clone(),
                 to_address: HumanAddr::from("fund_address2"),
-                amount: vec![coin(164602u128, "ucosm")],
+                amount: vec![coin(253601u128, "ucosm")],
             }),
             CosmosMsg::Bank(BankMsg::Send {
                 from_address: env.contract.address.clone(),
                 to_address: HumanAddr::from("fund_address3"),
-                amount: vec![coin(228537u128, "ucosm")],
+                amount: vec![coin(458637u128, "ucosm")],
             }),
             CosmosMsg::Bank(BankMsg::Send {
                 from_address: env.contract.address.clone(),
                 to_address: HumanAddr::from("fund_address4"),
-                amount: vec![coin(96648u128, "ucosm")],
+                amount: vec![coin(196653u128, "ucosm")],
             }),
             // left over msg
             CosmosMsg::Bank(BankMsg::Send {
@@ -574,7 +607,24 @@ mod tests {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
+
         assert_eq!(expected_msgs, res.unwrap().messages);
+
+        // check total cash in and out
+        let expected_msg_total_distr: u128 = expected_msgs
+            .into_iter()
+            .map(|d| match d {
+                CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
+                    amount.iter().map(|c| c.amount.u128()).sum()
+                }
+                _ => unimplemented!(),
+            })
+            .collect::<Vec<u128>>()
+            .iter()
+            .sum();
+        let total_fund = proposal1 + proposal2 + proposal3 + proposal4 + budget;
+
+        assert_eq!(total_fund, expected_msg_total_distr)
     }
 
     #[test]
@@ -586,7 +636,7 @@ mod tests {
             title: "title".to_string(),
             description: "desc".to_string(),
             metadata: None,
-            fund_address: Default::default(),
+            ..Default::default()
         };
 
         let err = PROPOSALS.save(&mut deps.storage, 1_u64.into(), &proposal);
@@ -608,6 +658,7 @@ mod tests {
             description: "desc".to_string(),
             metadata: None,
             fund_address: Default::default(),
+            ..Default::default()
         };
         let _ = PROPOSALS.save(&mut deps.storage, 1_u64.into(), &proposal);
 
@@ -617,6 +668,7 @@ mod tests {
             description: "desc".to_string(),
             metadata: None,
             fund_address: Default::default(),
+            ..Default::default()
         };
         let _ = PROPOSALS.save(&mut deps.storage, 2_u64.into(), &proposal1);
         let res = query_all_proposals(&deps).unwrap();

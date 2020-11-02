@@ -14,7 +14,7 @@
       "$ref": "#/definitions/HumanAddr"
     },
     "algorithm": {
-      "$ref": "#/definitions/QuadraticFundingAlgorithm"
+      "$ref": "#/definitions/QFAlgorithm"
     },
     "budget_denom": {
       "type": "string"
@@ -93,7 +93,7 @@
     "HumanAddr": {
       "type": "string"
     },
-    "QuadraticFundingAlgorithm": {
+    "QFAlgorithm": {
       "anyOf": [
         {
           "type": "object",
@@ -102,15 +102,7 @@
           ],
           "properties": {
             "capital_constrained_liberal_radicalism": {
-              "type": "object",
-              "required": [
-                "parameter"
-              ],
-              "properties": {
-                "parameter": {
-                  "type": "string"
-                }
-              }
+              "type": "object"
             }
           }
         }

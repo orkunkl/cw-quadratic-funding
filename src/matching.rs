@@ -10,10 +10,29 @@ pub enum QuadraticFundingAlgorithm {
     CapitalConstrainedLiberalRadicalism { parameter: String },
 }
 
+type CollectedVoteFunds = u128;
+type Fund = u128;
+type CLRAdjustedDistr = u128;
+
+struct RawGrant {
+    addr: CanonicalAddr,
+    funds: Vec<u128>,
+    collected_vote_funds: u128
+}
+
+struct CalculatedGrant {
+    addr: CanonicalAddr,
+    grant: u128,
+    collected_vote_funds: u128
+}
+
+type LeftOver = u128;
+
+// TODO rename u128 to something meaningful
 pub fn calculate_clr(
-    grants: Vec<(CanonicalAddr, Vec<u128>)>,
+    grants: Vec<RawGrant>,
     budget: Option<u128>,
-) -> Result<(Vec<(CanonicalAddr, u128)>, u128), ContractError> {
+) -> Result<(Vec<SummedGrant>, LeftOver), ContractError> {
     // clr algorithm works with budget constrain
     if let Some(budget) = budget {
         // calculate matches sum
@@ -27,6 +46,7 @@ pub fn calculate_clr(
         // shouldn't be used with tokens with > 10 decimal points
         // will cause overflow and panic on the during execution.
         let leftover = budget - constrained_sum;
+
         Ok((constrained, leftover))
     } else {
         Err(ContractError::CLRConstrainRequired {})
@@ -34,35 +54,40 @@ pub fn calculate_clr(
 }
 
 // takes square root of each fund, sums, then squares and returns u128
-fn calculate_matched_sum(grants: Vec<(CanonicalAddr, Vec<u128>)>) -> Vec<(CanonicalAddr, u128)> {
+fn calculate_matched_sum(
+    grants: Vec<RawGrant>,
+) -> Vec<SummedGrant> {
     grants
         .into_iter()
         .map(|g| {
-            let (proposal, votes) = g;
-            let sum_sqrts: u128 = votes.into_iter().map(|v| v.integer_sqrt()).sum();
-            (proposal, sum_sqrts * sum_sqrts)
+            let sum_sqrts: u128 = g.votes.into_iter().map(|v| v.integer_sqrt()).sum();
+            CalculatedGrant{
+                addr: g.addr,
+                grant:  sum_sqrts * sum_sqrts,
+                collected_vote_funds: collected_fund
+            }
         })
         .collect()
 }
 
 // takes square root of each fund, sums, then squares and returns u128
 fn constrain_by_budget(
-    grants: Vec<(CanonicalAddr, u128)>,
+    grants: Vec<(CanonicalAddr, Fund, CollectedVoteFunds)>,
     budget: u128,
-) -> Vec<(CanonicalAddr, u128)> {
+) -> Vec<(CanonicalAddr, Fund, CollectedVoteFunds)> {
     let raw_total: u128 = grants.iter().map(|g| g.1).sum();
     grants
         .into_iter()
         .map(|g| {
-            let (proposal, grant) = g;
-            (proposal, (grant * budget) / raw_total)
+            let (proposal, grant, collected_fund) = g;
+            (proposal, (grant * budget) / raw_total, collected_fund)
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::matching::calculate_clr;
+    use crate::matching::{calculate_clr, RawGrant, CalculatedGrant};
     use crate::state::Proposal;
     use cosmwasm_std::CanonicalAddr;
 
@@ -90,16 +115,21 @@ mod tests {
         let votes4 = vec![60000u128];
 
         let grants = vec![
-            (proposal1.fund_address.clone(), votes1),
-            (proposal2.fund_address.clone(), votes2),
-            (proposal3.fund_address.clone(), votes3),
-            (proposal4.fund_address.clone(), votes4),
+            CalculatedGrant{
+                addr: proposal1.fund_address.clone(),
+                grant:
+                collected_vote_funds: 0,
+            }
+            (proposal1.fund_address.clone(), votes1, 7200u128),
+            (proposal2.fund_address.clone(), votes2, 12345u128),
+            (proposal3.fund_address.clone(), votes3, 4456u128),
+            (proposal4.fund_address.clone(), votes4, 60000u128),
         ];
         let expected = vec![
-            (proposal1.fund_address, 84737u128),
-            (proposal2.fund_address, 147966u128),
-            (proposal3.fund_address, 52312u128),
-            (proposal4.fund_address, 714983u128),
+            (proposal1.fund_address, 84737u128, 7200u128),
+            (proposal2.fund_address, 147966u128, 12345u128),
+            (proposal3.fund_address, 52312u128, 4456u128),
+            (proposal4.fund_address, 714983u128, 60000u128),
         ];
         let res = calculate_clr(grants, Some(1000000u128));
         match res {
@@ -141,16 +171,32 @@ mod tests {
         let votes4 = vec![100000u128, 5u128];
 
         let grants = vec![
-            (proposal1.fund_address.clone(), votes1),
-            (proposal2.fund_address.clone(), votes2),
-            (proposal3.fund_address.clone(), votes3),
-            (proposal4.fund_address.clone(), votes4),
+            (
+                proposal1.fund_address.clone(),
+                votes1.clone(),
+                votes1.clone().iter().sum(),
+            ),
+            (
+                proposal2.fund_address.clone(),
+                votes2.clone(),
+                votes2.clone().iter().sum(),
+            ),
+            (
+                proposal3.fund_address.clone(),
+                votes3.clone(),
+                votes3.clone().iter().sum(),
+            ),
+            (
+                proposal4.fund_address.clone(),
+                votes4.clone(),
+                votes4.clone().iter().sum(),
+            ),
         ];
         let expected = vec![
-            (proposal1.fund_address, 60212u128),
-            (proposal2.fund_address, 164602u128),
-            (proposal3.fund_address, 228537u128),
-            (proposal4.fund_address, 96648u128),
+            (proposal1.fund_address, 60212u128, votes1.iter().sum()),
+            (proposal2.fund_address, 164602u128, votes2.iter().sum()),
+            (proposal3.fund_address, 228537u128, votes3.iter().sum()),
+            (proposal4.fund_address, 96648u128, votes4.iter().sum()),
         ];
         let res = calculate_clr(grants, Some(550000u128));
         match res {

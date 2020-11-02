@@ -1,41 +1,23 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Proposal",
+  "title": "Vote",
   "type": "object",
   "required": [
-    "collected_funds",
-    "description",
-    "fund_address",
-    "id",
-    "title"
+    "fund",
+    "proposal_id",
+    "voter"
   ],
   "properties": {
-    "collected_funds": {
-      "$ref": "#/definitions/Uint128"
+    "fund": {
+      "$ref": "#/definitions/Coin"
     },
-    "description": {
-      "type": "string"
-    },
-    "fund_address": {
-      "$ref": "#/definitions/CanonicalAddr"
-    },
-    "id": {
+    "proposal_id": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
     },
-    "metadata": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Binary"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "title": {
-      "type": "string"
+    "voter": {
+      "$ref": "#/definitions/CanonicalAddr"
     }
   },
   "definitions": {
@@ -45,6 +27,21 @@
     },
     "CanonicalAddr": {
       "$ref": "#/definitions/Binary"
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
     },
     "Uint128": {
       "type": "string"

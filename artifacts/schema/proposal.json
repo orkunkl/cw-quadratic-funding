@@ -3,16 +3,12 @@
   "title": "Proposal",
   "type": "object",
   "required": [
-    "collected_funds",
     "description",
     "fund_address",
     "id",
     "title"
   ],
   "properties": {
-    "collected_funds": {
-      "$ref": "#/definitions/Uint128"
-    },
     "description": {
       "type": "string"
     },
@@ -45,9 +41,6 @@
     },
     "CanonicalAddr": {
       "$ref": "#/definitions/Binary"
-    },
-    "Uint128": {
-      "type": "string"
     }
   }
 }
