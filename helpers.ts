@@ -118,6 +118,23 @@ const useOptions = (options: Options): Network => {
   return {setup, recoverMnemonic};
 }
 
+interface InitMsg {
+  readonly admin: string,
+  readonly leftover_addr: string,
+  readonly create_proposal_whitelist?: string[],
+  readonly vote_proposal_whitelist?: string[],
+  readonly voting_period: Expiration,
+  readonly proposal_period: Expiration,
+  readonly budget_denom: string,
+  readonly algorithm: QuadraticFundingAlgorithm,
+}
+
+interface QuadraticFundingAlgorithm {
+  readonly capital_constrained_liberal_radicalism: CapitalConstrainedLiberalRadicalism
+}
+
+interface CapitalConstrainedLiberalRadicalism { parameter: String }
+
 interface Config {
   readonly admin: string,
   readonly create_proposal_whitelist?: string[],
@@ -125,23 +142,9 @@ interface Config {
   readonly voting_period: Expiration,
   readonly proposal_period: Expiration,
   readonly budget: Coin,
-  readonly algorithm: QFAlgorithm,
+  readonly algorithm: QuadraticFundingAlgorithm,
 }
 
-
-interface QFAlgorithm {
-  readonly type?: string // TODO apply more strict enum check
-}
-
-interface InitMsg {
-  readonly admin: string,
-  readonly create_proposal_whitelist?: string[],
-  readonly vote_proposal_whitelist?: string[],
-  readonly voting_period: Expiration,
-  readonly proposal_period: Expiration,
-  readonly budget_denom: string,
-  readonly algorithm: QFAlgorithm,
-}
 
 interface Proposal {
   readonly id: number,
@@ -157,7 +160,7 @@ interface Vote {
   readonly fund: Coin,
 }
 
-type Expiration = {readonly at_height: string} | {readonly at_time: string} | {readonly never: {}};
+type Expiration = {readonly at_height: number} | {readonly at_time: number} | {readonly never: {}};
 
 interface QuadraticFundingInstance {
   readonly contractAddress: string
@@ -166,7 +169,7 @@ interface QuadraticFundingInstance {
   proposal: (id: number) => Promise<Proposal>
 
   // actions
-  createProposal: (title: string, description: string, fundAddress: string , amount: readonly Coin[], metadata?: BinaryType) => Promise<string>
+  createProposal: (title: string, description: string, fundAddress: string , metadata?: BinaryType) => Promise<string>
   voteProposal: (proposalId: number, amount: readonly Coin[]) => Promise<any>
   triggerDistribution: () => Promise<any>
 }
@@ -174,7 +177,7 @@ interface QuadraticFundingInstance {
 interface QuadraticFundingContract{
   upload: () => Promise<number>
 
-  instantiate: (codeId: number, initMsg: Record<string, string>, label: string) => Promise<QuadraticFundingInstance>
+  instantiate: (codeId: number, initMsg: Record<string, unknown>, label: string, amount: readonly Coin[]) => Promise<QuadraticFundingInstance>
 
   use: (contractAddress: string) => QuadraticFundingInstance
 }
@@ -185,13 +188,13 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
       return client.queryContractSmart(contractAddress, {proposal: { id}});
     };
 
-      const createProposal = async (title: string, description: string , fundAddress: string , amount: readonly Coin[], metadata?: BinaryType): Promise<string> => {
-      const result = await client.execute(contractAddress, {create_proposal: { title, description, fundAddress, metadata}}, "", amount);
+      const createProposal = async (title: string, description: string , fundAddress: string,  metadata?: BinaryType): Promise<string> => {
+      const result = await client.execute(contractAddress, {create_proposal: { title, description, fund_address: fundAddress, metadata}}, "");
       return result.transactionHash;
     };
 
     const voteProposal = async (proposalId: number, amount: readonly Coin[]): Promise<any> => {
-      const result = await client.execute(contractAddress, {vote: { proposalId }}, "", amount);
+      const result = await client.execute(contractAddress, {vote_proposal: { proposal_id: proposalId }}, "", amount);
       return result.transactionHash;
     };
 
@@ -228,8 +231,8 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
     return result.codeId;
   }
 
-  const instantiate = async (codeId: number, initMsg: Record<string, string>,label: string): Promise<QuadraticFundingInstance> => {
-    const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`});
+  const instantiate = async (codeId: number, initMsg: Record<string, unknown>, label: string, amount: readonly Coin[]): Promise<QuadraticFundingInstance> => {
+    const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, transferAmount: amount});
     return use(result.contractAddress);
   }
 
@@ -253,9 +256,48 @@ const QuadraticFunding = (client: SigningCosmWasmClient): QuadraticFundingContra
 //
 // const randomAddress = 'cosmos12my0yfs9ft4kafrzy0p2r7dn2ppd8zu65ll0ay'
 //
-// contract.createProposal("title", "desc", "cosmos10g4t8zcz7w8yeh0hufsyn9jluju64vnyll7luw", [{amount: 10000, denom: "ucosm"])
+// contract.createProposal("title", "desc", "cosmos10g4t8zcz7w8yeh0hufsyn9jluju64vnyll7luw")
 
-// contract.register("name", "some metadata", [{"denom": "ucosm", amount: "4000" }])
-// contract.record("name")
-// contract.transfer("name", randomAddress, [{"denom": "ushell", amount: "2000" }])
-//
+// Full test
+/*
+const client = await useOptions(hackatomOptions).setup("test");
+const { address } = await client.getAccount()
+
+const initMsg = {
+  admin: "cosmos1t6a7zh7s5c2hr7hwdhv6x86ddej2mum2gwy8z4",
+  leftover_addr: "cosmos1t6a7zh7s5c2hr7hwdhv6x86ddej2mum2gwy8z4",
+  voting_period: {at_height: 284270},
+  proposal_period: {at_height: 284270},
+  budget_denom: "ucosm",
+  algorithm: {
+    capital_constrained_liberal_radicalism: {parameter: "param"}
+  }
+}
+
+const factory = QuadraticFunding(client)
+
+const contract = await factory.use("cosmos180n6vgpfh7xvfmn7v5mtjwgvn5uysf9sl5w982")
+
+await contract.createProposal("title1", "desc", "cosmos146sch227m6erjytl4ax5fl78gh4fw03qmaehfh")
+await contract.createProposal("title2", "desc", "cosmos16hn7q0yhfrm28ta9zlk7fu46a98wss33xwfxys")
+await contract.createProposal("title3", "desc", "cosmos18nhdjva7vzkvtdmqqcllq6dk4te4h6afu2kaqg")
+await contract.createProposal("title4", "desc", "cosmos19ysc75nxtzkdnhnu90u7dw3ext6wmwdesyysx2")
+
+// terminal 1
+await contract.voteProposal(1, [{amount: "1200", denom: "ucosm"}])
+await contract.voteProposal(2, [{amount: "30000", denom: "ucosm"}])
+await contract.voteProposal(3, [{amount: "230000", denom: "ucosm"}])
+await contract.voteProposal(4, [{amount: "100000", denom: "ucosm"}])
+
+// terminal 2
+await contract.voteProposal(1, [{amount: "44999", denom: "ucosm"}])
+await contract.voteProposal(2, [{amount: "58999", denom: "ucosm"}])
+await contract.voteProposal(3, [{amount: "100", denom: "ucosm"}])
+await contract.voteProposal(4, [{amount: "5", denom: "ucosm"}])
+
+// terminal 3
+await contract.voteProposal(1, [{amount: "33", denom: "ucosm"}])
+
+// main terminal
+await contract.triggerDistribution()
+*/
