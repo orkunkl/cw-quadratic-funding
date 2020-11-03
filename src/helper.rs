@@ -4,7 +4,7 @@ use cosmwasm_std::Coin;
 // extract budget coin validate against sent_funds.denom
 pub fn extract_budget_coin(sent_funds: &[Coin], denom: &str) -> Result<Coin, ContractError> {
     if sent_funds.len() != 1 {
-        return Err(ContractError::MultipleCoinsSent {});
+        return Err(ContractError::WrongCoinSent {});
     }
     if sent_funds[0].denom != *denom {
         return Err(ContractError::WrongFundCoin {
@@ -37,7 +37,7 @@ mod tests {
 
         match extract_budget_coin(&info.clone().sent_funds, &denom.to_string()) {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::MultipleCoinsSent { .. }) => {}
+            Err(ContractError::WrongCoinSent { .. }) => {}
             Err(err) => println!("{:?}", err),
         }
     }
