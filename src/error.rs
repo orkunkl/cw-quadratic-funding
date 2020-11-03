@@ -21,8 +21,8 @@ pub enum ContractError {
     #[error("Voting period not expired")]
     VotingPeriodNotExpired {},
 
-    #[error("Multiple coin type sent")]
-    MultipleCoinsSent {},
+    #[error("Wrong coin sent (expected: {expected}, got: {got}")]
+    WrongCoinSent {expected: String, got: Vec<String>},
 
     #[error("Wrong fund coin (expected: {expected}, got: {got})")]
     WrongFundCoin { expected: String, got: String },
