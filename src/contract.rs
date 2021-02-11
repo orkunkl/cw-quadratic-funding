@@ -1,4 +1,7 @@
-use cosmwasm_std::{attr, coin, to_binary, BankMsg, Binary, CanonicalAddr, CosmosMsg, DepsMut, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Deps};
+use cosmwasm_std::{
+    attr, coin, to_binary, BankMsg, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult,
+};
 
 use crate::error::ContractError;
 use crate::helper::extract_budget_coin;
