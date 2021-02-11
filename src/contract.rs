@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, coin, to_binary, Api, BankMsg, Binary, CanonicalAddr, CosmosMsg, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
-};
+use cosmwasm_std::{attr, coin, to_binary, BankMsg, Binary, CanonicalAddr, CosmosMsg, DepsMut, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Deps};
 
 use crate::error::ContractError;
 use crate::helper::extract_budget_coin;
@@ -12,8 +9,8 @@ use cosmwasm_storage::nextval;
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: InitMsg,
@@ -47,14 +44,14 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         algorithm: msg.algorithm,
         budget,
     };
-    CONFIG.save(&mut deps.storage, &cfg)?;
+    CONFIG.save(deps.storage, &cfg)?;
 
     Ok(InitResponse::default())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -73,8 +70,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_create_proposal(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     title: String,
@@ -82,7 +79,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
     metadata: Option<Binary>,
     fund_address: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let config = CONFIG.load(&deps.storage)?;
+    let config = CONFIG.load(deps.storage)?;
 
     // check whitelist
     if let Some(wl) = config.create_proposal_whitelist {
@@ -96,7 +93,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
         return Err(ContractError::ProposalPeriodExpired {});
     }
 
-    let id = nextval(&mut proposal_seq(&mut deps.storage))?;
+    let id = nextval(&mut proposal_seq(deps.storage))?;
     let p = Proposal {
         id,
         title: title.clone(),
@@ -105,7 +102,7 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
         fund_address: deps.api.canonical_address(&fund_address)?,
         ..Default::default()
     };
-    PROPOSALS.save(&mut deps.storage, id.into(), &p)?;
+    PROPOSALS.save(deps.storage, id.into(), &p)?;
 
     let res = HandleResponse {
         messages: vec![],
@@ -120,13 +117,13 @@ pub fn handle_create_proposal<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_vote_proposal(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
-    let config = CONFIG.load(&deps.storage)?;
+    let config = CONFIG.load(deps.storage)?;
 
     // check whitelist
     if let Some(wl) = config.vote_proposal_whitelist {
@@ -144,7 +141,7 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     let fund = extract_budget_coin(&info.sent_funds, &config.budget.denom)?;
 
     // check existence of the proposal and collect funds in proposal
-    let proposal = PROPOSALS.update(&mut deps.storage, proposal_id.into(), |op| match op {
+    let proposal = PROPOSALS.update(deps.storage, proposal_id.into(), |op| match op {
         None => Err(ContractError::ProposalNotFound {}),
         Some(mut proposal) => {
             proposal.collected_funds += fund.amount;
@@ -160,12 +157,12 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
 
     // check sender did not voted on proposal
     let vote_key = VOTES.key((proposal_id.into(), info.sender.as_bytes()));
-    if vote_key.may_load(&deps.storage)?.is_some() {
+    if vote_key.may_load(deps.storage)?.is_some() {
         return Err(ContractError::AddressAlreadyVotedProject {});
     }
 
     // save vote
-    vote_key.save(&mut deps.storage, &vote)?;
+    vote_key.save(deps.storage, &vote)?;
 
     let res = HandleResponse {
         attributes: vec![
@@ -180,12 +177,12 @@ pub fn handle_vote_proposal<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_trigger_distribution(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
-    let config = CONFIG.load(&deps.storage)?;
+    let config = CONFIG.load(deps.storage)?;
 
     // only admin can trigger distribution
     if deps.api.canonical_address(&info.sender)? != config.admin {
@@ -198,7 +195,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     }
 
     let query_proposals: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, None, None, Order::Ascending)
+        .range(deps.storage, None, None, Order::Ascending)
         .collect();
 
     let proposals: Vec<Proposal> = query_proposals?.into_iter().map(|p| p.1).collect();
@@ -208,7 +205,7 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     for p in proposals {
         let vote_query: StdResult<Vec<(Vec<u8>, Vote)>> = VOTES
             .prefix(p.id.into())
-            .range(&deps.storage, None, None, Order::Ascending)
+            .range(deps.storage, None, None, Order::Ascending)
             .collect();
 
         let mut votes: Vec<u128> = vec![];
@@ -255,29 +252,20 @@ pub fn handle_trigger_distribution<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::ProposalByID { id } => to_binary(&query_proposal_id(deps, id)?),
         QueryMsg::AllProposals {} => to_binary(&query_all_proposals(deps)?),
     }
 }
 
-fn query_proposal_id<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    id: u64,
-) -> StdResult<Proposal> {
-    PROPOSALS.load(&deps.storage, id.into())
+fn query_proposal_id(deps: Deps, id: u64) -> StdResult<Proposal> {
+    PROPOSALS.load(deps.storage, id.into())
 }
 
-fn query_all_proposals<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<AllProposalsResponse> {
+fn query_all_proposals(deps: Deps) -> StdResult<AllProposalsResponse> {
     let all: StdResult<Vec<(Vec<u8>, Proposal)>> = PROPOSALS
-        .range(&deps.storage, None, None, Order::Ascending)
+        .range(deps.storage, None, None, Order::Ascending)
         .collect();
     all.map(|p| {
         let res = p.into_iter().map(|x| x.1).collect();
@@ -316,7 +304,7 @@ mod tests {
             },
         };
 
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
         let msg = HandleMsg::CreateProposal {
             title: String::from("test"),
             description: String::from("test"),
@@ -324,7 +312,7 @@ mod tests {
             fund_address: HumanAddr::from("fund_address"),
         };
 
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         // success case
         match res {
             Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(1_u64.to_be_bytes())),
@@ -333,7 +321,7 @@ mod tests {
 
         // proposal period expired
         env.block.height = env.block.height + 1000;
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
 
         match res {
             Ok(_) => panic!("expected error"),
@@ -357,9 +345,9 @@ mod tests {
                 parameter: "".to_string(),
             },
         };
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
 
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
 
         match res {
             Ok(_) => panic!("expected error"),
@@ -386,7 +374,7 @@ mod tests {
             proposal_period: Expiration::AtHeight(env.block.height + 10),
             budget_denom: String::from("ucosm"),
         };
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
 
         let create_proposal_msg = HandleMsg::CreateProposal {
             title: String::from("test"),
@@ -396,7 +384,7 @@ mod tests {
         };
 
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             env.clone(),
             info.clone(),
             create_proposal_msg.clone(),
@@ -407,7 +395,7 @@ mod tests {
         }
 
         let msg = HandleMsg::VoteProposal { proposal_id: 1 };
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         // success case
         match res {
             Ok(_) => {}
@@ -415,7 +403,7 @@ mod tests {
         }
 
         // double vote prevention
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::AddressAlreadyVotedProject {}) => {}
@@ -425,8 +413,8 @@ mod tests {
         // whitelist check
         let mut deps = mock_dependencies(&[]);
         init_msg.vote_proposal_whitelist = Some(vec![HumanAddr::from("admin")]);
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::Unauthorized {}) => {}
@@ -436,9 +424,9 @@ mod tests {
         // proposal period expired
         let mut deps = mock_dependencies(&[]);
         init_msg.vote_proposal_whitelist = None;
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
         env.block.height = env.block.height + 15;
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
 
         match res {
             Ok(_) => panic!("expected error"),
@@ -467,7 +455,7 @@ mod tests {
             budget_denom: String::from("ucosm"),
         };
 
-        init(&mut deps, env.clone(), info.clone(), init_msg.clone()).unwrap();
+        init(deps.as_mut(), env.clone(), info.clone(), init_msg.clone()).unwrap();
 
         // insert proposals
         let msg = HandleMsg::CreateProposal {
@@ -476,7 +464,7 @@ mod tests {
             metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address1"),
         };
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(1_u64.to_be_bytes())),
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -488,7 +476,7 @@ mod tests {
             metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address2"),
         };
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(2_u64.to_be_bytes())),
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -500,7 +488,7 @@ mod tests {
             metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address3"),
         };
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(3_u64.to_be_bytes())),
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -511,7 +499,7 @@ mod tests {
             metadata: Some(Binary::from(b"test")),
             fund_address: HumanAddr::from("fund_address4"),
         };
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(seq) => assert_eq!(seq.data.unwrap(), Binary::from(4_u64.to_be_bytes())),
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -522,7 +510,7 @@ mod tests {
         let msg = HandleMsg::VoteProposal { proposal_id: 1 };
         let vote11_fund = 1200u128;
         let info = mock_info("address1", &[coin(vote11_fund, "ucosm")]);
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
@@ -530,10 +518,10 @@ mod tests {
 
         let vote12_fund = 44999u128;
         let info = mock_info("address2", &[coin(vote12_fund, "ucosm")]);
-        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let vote13_fund = 33u128;
         let info = mock_info("address3", &[coin(vote13_fund, "ucosm")]);
-        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let proposal1 = vote11_fund + vote12_fund + vote13_fund;
 
         // proposal2
@@ -541,49 +529,49 @@ mod tests {
 
         let vote21_fund = 30000u128;
         let info = mock_info("address4", &[coin(vote21_fund, "ucosm")]);
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
         let vote22_fund = 58999u128;
         let info = mock_info("address5", &[coin(vote22_fund, "ucosm")]);
-        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let proposal2 = vote21_fund + vote22_fund;
 
         // proposal3
         let msg = HandleMsg::VoteProposal { proposal_id: 3 };
         let vote31_fund = 230000u128;
         let info = mock_info("address6", &[coin(vote31_fund, "ucosm")]);
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
         let vote32_fund = 100u128;
         let info = mock_info("address7", &[coin(vote32_fund, "ucosm")]);
-        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let proposal3 = vote31_fund + vote32_fund;
 
         // proposal4
         let msg = HandleMsg::VoteProposal { proposal_id: 4 };
         let vote41_fund = 100000u128;
         let info = mock_info("address8", &[coin(vote41_fund, "ucosm")]);
-        let res = handle(&mut deps, env.clone(), info.clone(), msg.clone());
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
         let vote42_fund = 5u128;
         let info = mock_info("address9", &[coin(vote42_fund, "ucosm")]);
-        handle(&mut deps, env.clone(), info.clone(), msg.clone()).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let proposal4 = vote41_fund + vote42_fund;
 
         let trigger_msg = HandleMsg::TriggerDistribution {};
         let info = mock_info("admin", &[]);
         let mut env = mock_env();
         env.block.height += 1000;
-        let res = handle(&mut deps, env.clone(), info, trigger_msg);
+        let res = handle(deps.as_mut(), env.clone(), info, trigger_msg);
 
         let expected_msgs: Vec<CosmosMsg<_>> = vec![
             CosmosMsg::Bank(BankMsg::Send {
@@ -654,7 +642,7 @@ mod tests {
             Ok(_) => {}
             e => panic!("unexpected error, got {}", e.unwrap_err()),
         }
-        let res = query_proposal_id(&deps, 1).unwrap();
+        let res = query_proposal_id(deps.as_ref(), 1).unwrap();
         assert_eq!(proposal, res);
     }
 
@@ -681,7 +669,7 @@ mod tests {
             ..Default::default()
         };
         let _ = PROPOSALS.save(&mut deps.storage, 2_u64.into(), &proposal1);
-        let res = query_all_proposals(&deps).unwrap();
+        let res = query_all_proposals(deps.as_ref()).unwrap();
 
         assert_eq!(
             AllProposalsResponse {

@@ -21,7 +21,7 @@ pub struct Config {
     pub algorithm: QuadraticFundingAlgorithm,
 }
 
-pub const CONFIG: Item<Config> = Item::new(b"config");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Proposal {
@@ -33,10 +33,10 @@ pub struct Proposal {
     pub collected_funds: Uint128,
 }
 
-pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposal");
+pub const PROPOSALS: Map<U64Key, Proposal> = Map::new("proposal");
 pub const PROPOSAL_SEQ: &[u8] = b"proposal_seq";
 
-pub fn proposal_seq<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
+pub fn proposal_seq(storage: &mut dyn Storage) -> Singleton<u64> {
     singleton(storage, PROPOSAL_SEQ)
 }
 
@@ -47,4 +47,4 @@ pub struct Vote {
     pub fund: Coin,
 }
 
-pub const VOTES: Map<(U64Key, &[u8]), Vote> = Map::new(b"votes");
+pub const VOTES: Map<(U64Key, &[u8]), Vote> = Map::new("votes");
